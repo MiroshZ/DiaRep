@@ -62,14 +62,21 @@ select {
 }
 
 .brand-mark {
-  display: grid;
-  width: 44px;
+  display: flex;
+  width: 54px;
   height: 44px;
-  place-items: center;
-  border-radius: 12px;
-  background: var(--accent);
-  color: white;
-  font-weight: 800;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.brand-mark img {
+  width: 86px;
+  max-width: none;
+  transform: translateX(-7px);
 }
 
 .brand strong,
@@ -158,6 +165,15 @@ select {
   margin: 16px 0;
   font-size: clamp(2.4rem, 6vw, 5rem);
   line-height: 0.97;
+}
+
+.hero-logo {
+  width: min(260px, 62vw);
+  height: auto;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.16);
 }
 
 .hero p {
