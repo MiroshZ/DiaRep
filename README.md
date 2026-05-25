@@ -70,7 +70,11 @@ total_bolus = meal_bolus + correction_bolus - active_insulin
 
 ## Запуск приложения
 
-Команды запуска выполняются из папки `diaagent`.
+Команды запуска выполняются из папки `diaagent`. Если вы находитесь в корне репозитория, сначала выполните:
+
+```bash
+cd diaagent
+```
 
 Windows:
 
