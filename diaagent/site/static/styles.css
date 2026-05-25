@@ -55,28 +55,28 @@ select {
 
 .brand {
   display: flex;
-  gap: 12px;
+  gap: 13px;
   align-items: center;
   color: inherit;
   text-decoration: none;
 }
 
 .brand-mark {
-  display: flex;
-  width: 54px;
-  height: 44px;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
   overflow: hidden;
-  border: 1px solid rgba(15, 118, 110, 0.14);
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ffffff, #eef8f6);
+  box-shadow: 0 10px 24px rgba(15, 76, 71, 0.08);
 }
 
 .brand-mark img {
-  width: 86px;
-  max-width: none;
-  transform: translateX(-7px);
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .brand strong,
@@ -167,13 +167,26 @@ select {
   line-height: 0.97;
 }
 
-.hero-logo {
-  width: min(260px, 62vw);
-  height: auto;
-  margin-bottom: 24px;
+.hero-brand {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 8px 12px 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 800;
+  backdrop-filter: blur(10px);
+}
+
+.hero-brand img {
+  width: 26px;
+  height: 26px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+  object-fit: contain;
 }
 
 .hero p {
