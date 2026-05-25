@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DiaAgent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#top" aria-label="DiaAgent">
+          <span class="brand-mark">D</span>
+          <span>
+            <strong>DiaAgent</strong>
+            <small>Питание и болюс</small>
+          </span>
+        </a>
+
+        <nav class="nav">
+          <a href="#calculate">Расчёт</a>
+          <a href="#account">Личный кабинет</a>
+          <a href="#history">История</a>
+          <a href="#safety">Безопасность</a>
+        </nav>
+
+        <div class="sidebar-panel">
+          <span class="status-dot"></span>
+          <p id="profileStatus">Nightscout не подключён</p>
+        </div>
+      </aside>
+
+      <main id="top" class="content">
+        <section class="hero">
+          <div class="hero-copy">
+            <span class="eyebrow">персональный расчёт</span>
+            <h1>Расчёт болюса без лишних таблиц</h1>
+            <p>
+              Опишите еду обычным языком, подключите Nightscout при необходимости
+              и получите понятный расчёт по вашим индивидуальным параметрам.
+            </p>
+          </div>
+          <div class="hero-card" aria-label="Сводка">
+            <span>Последний расчёт</span>
+            <strong id="heroBolus">—</strong>
+            <small id="heroCarbs">Углеводы пока не рассчитаны</small>
+          </div>
+        </section>
+
+        <section id="safety" class="notice">
+          <strong>Важно:</strong>
+          приложение не является медицинским изделием. Расчёт не является
+          медицинской рекомендацией, не заменяет врача и должен использовать
+          только индивидуальные параметры, которые вы уже получили от
+          медицинского специалиста.
+        </section>
+
+        <section id="calculate" class="grid two-columns">
+          <form id="calcForm" class="panel form-panel">
+            <div class="section-heading">
+              <span>01</span>
+              <div>
+                <h2>Еда и глюкоза</h2>
+                <p>Например: рис 150 г, банан 120 г.</p>
+              </div>
+            </div>
+
+            <label class="field full">
+              <span>Что планируется съесть</span>
+              <textarea
+                id="mealText"
+                rows="4"
+                placeholder="рис 150 г, куриная грудка 120 г"
+              >рис 150 г</textarea>
+            </label>
+
+            <div class="switch-row">
+              <div>
+                <strong>Использовать Nightscout</strong>
+                <small>Если профиль подключён, сахар будет подставлен автоматически.</small>
+              </div>
+              <label class="switch">
+                <input id="useNightscout" type="checkbox" />
+                <span></span>
+              </label>
+            </div>
+
+            <label id="manualGlucoseField" class="field">
+              <span>Текущая глюкоза, ммоль/л</span>
+              <input id="currentGlucose" type="number" min="0.1" step="0.1" value="6.5" />
+            </label>
+
+            <div class="section-heading compact">
+              <span>02</span>
+              <div>
+                <h2>Коэффициенты</h2>
+                <p>Используйте только параметры от специалиста.</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <label class="field">
+                <span>Углеводный коэффициент</span>
+                <input id="ratio" type="number" min="0.1" step="0.1" value="12" />
+              </label>
+              <label class="field">
+                <span>Целевая глюкоза, ммоль/л</span>
+                <input id="target" type="number" min="0.1" step="0.1" value="6" />
+              </label>
+              <label class="field">
+                <span>Фактор чувствительности</span>
+                <input id="correctionFactor" type="number" min="0.1" step="0.1" value="2" />
+              </label>
+              <label class="field">
+                <span>Активный инсулин, ед.</span>
+                <input id="activeInsulin" type="number" min="0" step="0.1" value="0" />
+              </label>
+            </div>
+
+            <button class="primary-button" type="submit">
+              Рассчитать
+            </button>
+          </form>
+
+          <section class="panel result-panel">
+            <div class="section-heading">
+              <span>03</span>
+              <div>
+                <h2>Результат</h2>
+                <p id="resultHint">Заполните форму и запустите расчёт.</p>
+              </div>
+            </div>
+
+            <div class="metrics">
+              <article>
+                <span>Белки</span>
+                <strong id="proteinMetric">—</strong>
+              </article>
+              <article>
+                <span>Жиры</span>
+                <strong id="fatMetric">—</strong>
+              </article>
+              <article>
+                <span>Углеводы</span>
+                <strong id="carbsMetric">—</strong>
+              </article>
+              <article>
+                <span>Итоговый болюс</span>
+                <strong id="bolusMetric">—</strong>
+              </article>
+            </div>
+
+            <div id="glucoseCard" class="glucose-card hidden"></div>
+            <div id="foodTable" class="food-table empty">Распознанные продукты появятся здесь.</div>
+            <div id="warnings" class="warnings"></div>
+            <pre id="explanation" class="explanation"></pre>
+          </section>
+        </section>
+
+        <section id="account" class="panel">
+          <div class="section-heading">
+            <span>04</span>
+            <div>
+              <h2>Личный кабинет</h2>
+              <p>Данные профиля хранятся в браузере и не попадают в git.</p>
+            </div>
+          </div>
+
+          <div class="account-grid">
+            <label class="field">
+              <span>Статус доступа</span>
+              <select id="paidAccess">
+                <option value="false">Не активен</option>
+                <option value="true">Активен</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Nightscout URL</span>
+              <input id="nightscoutUrl" type="url" placeholder="https://example-nightscout.ru" />
+            </label>
+            <label class="field">
+              <span>API key / read-only token</span>
+              <input id="nightscoutKey" type="password" autocomplete="off" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="saveProfile" class="secondary-button" type="button">Сохранить профиль</button>
+            <button id="testNightscout" class="ghost-button" type="button">Проверить Nightscout</button>
+          </div>
+          <p class="small-note">
+            Для внешних приложений лучше использовать read-only token с ограниченными правами.
+          </p>
+        </section>
+
+        <section id="history" class="panel">
+          <div class="section-heading">
+            <span>05</span>
+            <div>
+              <h2>История</h2>
+              <p>Последние расчёты на этом сервере.</p>
+            </div>
+          </div>
+          <div id="historyTable" class="food-table empty">История пока пуста.</div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>
