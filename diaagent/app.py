@@ -8,7 +8,7 @@ from calculator import calculate_total_bolus
 from database import get_history, init_db, save_calculation
 from llm_agent import generate_explanation
 from models import BolusInput
-from nutrition import estimate_carbs_from_text, load_foods
+from nutrition import estimate_nutrition_from_text
 from safety import check_safety
 
 
@@ -19,8 +19,11 @@ def format_meal_items(items: list[dict]) -> pd.DataFrame:
             {
                 "Продукт": item["name"],
                 "Масса, г": item["weight_g"],
+                "Белки, г": item["protein_g"],
+                "Жиры, г": item["fat_g"],
                 "Углеводы на 100 г": item["carbs_per_100g"],
                 "Углеводы, г": item["carbs_g"],
+                "Ккал": item["kcal"],
                 "Источник": item["source"],
             }
             for item in items
@@ -138,7 +141,6 @@ st.warning(
 if "meal_estimate" not in st.session_state:
     st.session_state.meal_estimate = None
 
-foods_df = load_foods()
 calc_tab, history_tab = st.tabs(["Главная", "История"])
 
 with calc_tab:
@@ -198,12 +200,8 @@ with calc_tab:
         submitted = st.form_submit_button("Оценить еду и рассчитать болюс")
 
     if submitted:
-        with st.spinner("Оцениваю углеводы и считаю болюс..."):
-            meal_estimate = estimate_carbs_from_text(
-                meal_text,
-                foods_df,
-                use_openfoodfacts=True,
-            )
+        with st.spinner("Получаю БЖУ и считаю болюс..."):
+            meal_estimate = estimate_nutrition_from_text(meal_text)
             st.session_state.meal_estimate = meal_estimate
             carbs_g = meal_estimate["total_carbs"]
 
@@ -253,20 +251,25 @@ with calc_tab:
                 )
 
             st.caption(
-                "Часть данных может подбираться из Open Food Facts. Значения стоит "
-                "проверять по упаковке продукта."
+                "Данные БЖУ получены из внешних источников: All The Nutrients "
+                "или Open Food Facts. Значения стоит проверять по упаковке продукта."
             )
 
             st.subheader("Результат")
-            metric_cols = st.columns(5)
-            metric_cols[0].metric("Углеводы", f"{input_data.carbs_g} г")
-            metric_cols[1].metric("Болюс на еду", f"{result['meal_bolus']} ед.")
-            metric_cols[2].metric(
+            nutrition_cols = st.columns(4)
+            nutrition_cols[0].metric("Белки", f"{meal_estimate['total_protein']} г")
+            nutrition_cols[1].metric("Жиры", f"{meal_estimate['total_fat']} г")
+            nutrition_cols[2].metric("Углеводы", f"{input_data.carbs_g} г")
+            nutrition_cols[3].metric("Ккал", f"{meal_estimate['total_kcal']}")
+
+            metric_cols = st.columns(4)
+            metric_cols[0].metric("Болюс на еду", f"{result['meal_bolus']} ед.")
+            metric_cols[1].metric(
                 "Коррекционный болюс",
                 f"{result['correction_bolus']} ед.",
             )
-            metric_cols[3].metric("Активный инсулин", f"{result['active_insulin']} ед.")
-            metric_cols[4].metric("Итоговый болюс", f"{result['total_bolus']} ед.")
+            metric_cols[2].metric("Активный инсулин", f"{result['active_insulin']} ед.")
+            metric_cols[3].metric("Итоговый болюс", f"{result['total_bolus']} ед.")
 
             st.subheader("Важные предупреждения")
             for warning in warnings:

@@ -1,11 +1,10 @@
 import sys
 from pathlib import Path
 
-import pandas as pd
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nutrition import estimate_carbs_from_text, parse_meal_text  # noqa: E402
+import nutrition  # noqa: E402
+from nutrition import estimate_nutrition_from_text, parse_meal_text  # noqa: E402
 
 
 def test_parse_meal_text_with_grams() -> None:
@@ -17,19 +16,28 @@ def test_parse_meal_text_with_grams() -> None:
     ]
 
 
-def test_estimate_carbs_from_text_uses_local_foods() -> None:
-    foods_df = pd.DataFrame(
-        {
-            "name": ["гречка варёная"],
-            "carbs_per_100g": [20],
+def test_estimate_nutrition_from_text_uses_api_result(monkeypatch) -> None:
+    def fake_fetch_food_nutrition(query: str) -> dict:
+        return {
+            "name": query,
+            "protein_per_100g": 3,
+            "fat_per_100g": 1,
+            "carbs_per_100g": 20,
+            "kcal_per_100g": 100,
+            "source": "Open Food Facts",
+            "source_url": "https://ru.openfoodfacts.org/",
         }
+
+    monkeypatch.setattr(
+        nutrition,
+        "fetch_food_nutrition",
+        fake_fetch_food_nutrition,
     )
 
-    result = estimate_carbs_from_text(
-        "гречки 50 грамм",
-        foods_df,
-        use_openfoodfacts=False,
-    )
+    result = estimate_nutrition_from_text("гречки 50 грамм")
 
+    assert result["total_protein"] == 1.5
+    assert result["total_fat"] == 0.5
     assert result["total_carbs"] == 10
-    assert result["items"][0]["source"] == "локальный справочник"
+    assert result["total_kcal"] == 50
+    assert result["items"][0]["source"] == "Open Food Facts"
