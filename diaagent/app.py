@@ -12,12 +12,6 @@ from nutrition import estimate_carbs_from_text, load_foods
 from safety import check_safety
 
 
-def use_estimated_carbs(estimated_carbs: float) -> None:
-    """Переносит рассчитанные углеводы в форму болюса."""
-    st.session_state.estimated_carbs_g = estimated_carbs
-    st.session_state.carbs_g = estimated_carbs
-
-
 def format_meal_items(items: list[dict]) -> pd.DataFrame:
     """Готовит аккуратную таблицу распознанных продуктов."""
     return pd.DataFrame(
@@ -141,33 +135,33 @@ st.warning(
     "от медицинского специалиста."
 )
 
-if "estimated_carbs_g" not in st.session_state:
-    st.session_state.estimated_carbs_g = 60.0
-
-if "carbs_g" not in st.session_state:
-    st.session_state.carbs_g = float(st.session_state.estimated_carbs_g)
-
 if "meal_estimate" not in st.session_state:
     st.session_state.meal_estimate = None
 
 foods_df = load_foods()
-calc_tab, foods_tab, history_tab = st.tabs(
-    ["Расчёт болюса", "База продуктов", "История"]
-)
+calc_tab, history_tab = st.tabs(["Главная", "История"])
 
 with calc_tab:
-    st.subheader("Параметры расчёта")
+    st.subheader("Еда и параметры расчёта")
+    st.markdown(
+        '<div class="diaagent-note">'
+        "Опишите еду с массой в граммах, затем укажите глюкозу и индивидуальные "
+        "коэффициенты. Углеводы будут рассчитаны автоматически."
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     with st.form("bolus_form"):
+        meal_text = st.text_area(
+            "Что планируется съесть",
+            value="гречки 50 грамм",
+            height=110,
+            help="Можно указать несколько продуктов: гречки 50 грамм, банан 120 г.",
+        )
+
         col_left, col_right = st.columns(2)
 
         with col_left:
-            carbs_g = st.number_input(
-                "Углеводы, г",
-                min_value=0.0,
-                step=1.0,
-                key="carbs_g",
-            )
             insulin_to_carb_ratio = st.number_input(
                 "Углеводный коэффициент, г углеводов на 1 ед. инсулина",
                 min_value=0.1,
@@ -201,9 +195,18 @@ with calc_tab:
                 step=0.1,
             )
 
-        submitted = st.form_submit_button("Рассчитать болюс")
+        submitted = st.form_submit_button("Оценить еду и рассчитать болюс")
 
     if submitted:
+        with st.spinner("Оцениваю углеводы и считаю болюс..."):
+            meal_estimate = estimate_carbs_from_text(
+                meal_text,
+                foods_df,
+                use_openfoodfacts=True,
+            )
+            st.session_state.meal_estimate = meal_estimate
+            carbs_g = meal_estimate["total_carbs"]
+
         try:
             input_data = BolusInput(
                 carbs_g=carbs_g,
@@ -226,12 +229,44 @@ with calc_tab:
             explanation = generate_explanation(input_data, result, warnings)
             save_calculation(input_data, result, warnings)
 
+            st.subheader("Распознанная еда")
+            if meal_estimate["items"]:
+                meal_items_df = format_meal_items(meal_estimate["items"])
+                st.dataframe(
+                    meal_items_df,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info(
+                    "Не удалось распознать продукты и массу. Попробуйте написать "
+                    "проще, например: гречки 50 грамм."
+                )
+
+            if meal_estimate["not_found"]:
+                missing_names = ", ".join(
+                    item["query"] for item in meal_estimate["not_found"]
+                )
+                st.info(
+                    "Не удалось найти углеводы для: "
+                    f"{missing_names}. Проверьте название или укажите продукт проще."
+                )
+
+            st.caption(
+                "Часть данных может подбираться из Open Food Facts. Значения стоит "
+                "проверять по упаковке продукта."
+            )
+
             st.subheader("Результат")
-            metric_cols = st.columns(4)
-            metric_cols[0].metric("Болюс на еду", f"{result['meal_bolus']} ед.")
-            metric_cols[1].metric("Коррекционный болюс", f"{result['correction_bolus']} ед.")
-            metric_cols[2].metric("Активный инсулин", f"{result['active_insulin']} ед.")
-            metric_cols[3].metric("Итоговый болюс", f"{result['total_bolus']} ед.")
+            metric_cols = st.columns(5)
+            metric_cols[0].metric("Углеводы", f"{input_data.carbs_g} г")
+            metric_cols[1].metric("Болюс на еду", f"{result['meal_bolus']} ед.")
+            metric_cols[2].metric(
+                "Коррекционный болюс",
+                f"{result['correction_bolus']} ед.",
+            )
+            metric_cols[3].metric("Активный инсулин", f"{result['active_insulin']} ед.")
+            metric_cols[4].metric("Итоговый болюс", f"{result['total_bolus']} ед.")
 
             st.subheader("Важные предупреждения")
             for warning in warnings:
@@ -239,61 +274,6 @@ with calc_tab:
 
             st.subheader("Пояснение")
             st.write(explanation)
-
-with foods_tab:
-    st.subheader("Опишите приём пищи")
-    st.markdown(
-        '<div class="diaagent-note">'
-        "Например: гречки 50 грамм, банан 120 г, йогурт 150 г."
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    meal_text = st.text_area(
-        "Что планируется съесть",
-        value="гречки 50 грамм",
-        height=110,
-    )
-
-    if st.button("Оценить углеводы"):
-        with st.spinner("Считаю углеводы по описанию..."):
-            st.session_state.meal_estimate = estimate_carbs_from_text(
-                meal_text,
-                foods_df,
-                use_openfoodfacts=True,
-            )
-
-    if st.session_state.meal_estimate:
-        meal_estimate = st.session_state.meal_estimate
-
-        st.metric("Всего углеводов", f"{meal_estimate['total_carbs']} г")
-
-        if meal_estimate["items"]:
-            meal_items_df = format_meal_items(meal_estimate["items"])
-            st.dataframe(
-                meal_items_df,
-                use_container_width=True,
-                hide_index=True,
-            )
-
-            if st.button(
-                "Перенести углеводы в расчёт",
-                on_click=use_estimated_carbs,
-                args=(meal_estimate["total_carbs"],),
-            ):
-                st.success("Количество углеводов перенесено в форму расчёта.")
-
-        if meal_estimate["not_found"]:
-            missing_names = ", ".join(item["query"] for item in meal_estimate["not_found"])
-            st.info(
-                "Не удалось найти углеводы для: "
-                f"{missing_names}. Проверьте название или укажите продукт проще."
-            )
-
-        st.caption(
-            "Часть данных может подбираться из Open Food Facts. Значения стоит "
-            "проверять по упаковке продукта."
-        )
 
 with history_tab:
     st.subheader("Последние расчёты")
