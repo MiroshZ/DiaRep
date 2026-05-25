@@ -24,7 +24,7 @@ def test_high_dose_warning() -> None:
     assert any("доза выглядит высокой" in warning for warning in warnings)
 
 
-def test_educational_warning_is_always_present() -> None:
+def test_information_warning_is_always_present() -> None:
     warnings = check_safety(current_glucose_mmol=7, total_bolus=1, carbs_g=10)
 
-    assert any("учебный расчёт" in warning for warning in warnings)
+    assert any("информационный расчёт" in warning for warning in warnings)

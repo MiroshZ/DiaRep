@@ -12,12 +12,12 @@ def _to_dict(data: Any) -> dict:
 
 
 def generate_explanation(input_data: Any, result: dict, warnings: list[str]) -> str:
-    """Формирует нейтральное объяснение учебного расчёта на русском языке."""
+    """Формирует нейтральное объяснение расчёта на русском языке."""
     data = _to_dict(input_data)
     warnings_text = "\n".join(f"- {warning}" for warning in warnings)
 
     return (
-        "Учебная модель получила следующие данные: "
+        "Модель получила следующие данные: "
         f"{data['carbs_g']} г углеводов, углеводный коэффициент "
         f"{data['insulin_to_carb_ratio']} г/ед., текущая глюкоза "
         f"{data['current_glucose_mmol']} ммоль/л, целевая глюкоза "
@@ -33,7 +33,7 @@ def generate_explanation(input_data: Any, result: dict, warnings: list[str]) -> 
         f"({data['current_glucose_mmol']} - {data['target_glucose_mmol']}) / "
         f"{data['correction_factor_mmol']} = {result['correction_bolus']} ед. "
         "Если расчёт коррекции получается ниже нуля, используется 0.\n\n"
-        "Расчёт показывает итоговый учебный болюс: "
+        "Расчёт показывает итоговый болюс: "
         f"{result['meal_bolus']} + {result['correction_bolus']} - "
         f"{result['active_insulin']} = {result['total_bolus']} ед.\n\n"
         "Предупреждения:\n"
