@@ -5,9 +5,10 @@ import streamlit as st
 from pydantic import ValidationError
 
 from calculator import calculate_total_bolus
-from database import get_history, init_db, save_calculation
+from database import get_history, get_user_settings, init_db, save_calculation, save_user_settings
 from llm_agent import generate_explanation
 from models import BolusInput
+from nightscout import NightscoutError, fetch_current_glucose
 from nutrition import estimate_nutrition_from_text
 from safety import check_safety
 
@@ -141,17 +142,35 @@ st.warning(
 if "meal_estimate" not in st.session_state:
     st.session_state.meal_estimate = None
 
-calc_tab, history_tab = st.tabs(["Главная", "История"])
+if "nightscout_glucose" not in st.session_state:
+    st.session_state.nightscout_glucose = None
+
+user_settings = get_user_settings()
+nightscout_connected = bool(
+    user_settings.get("paid_access_active")
+    and user_settings.get("nightscout_url")
+    and user_settings.get("nightscout_api_key")
+)
+
+calc_tab, history_tab, account_tab = st.tabs(["Главная", "История", "Личный кабинет"])
 
 with calc_tab:
     st.subheader("Еда и параметры расчёта")
     st.markdown(
         '<div class="diaagent-note">'
-        "Опишите еду с массой в граммах, затем укажите глюкозу и индивидуальные "
-        "коэффициенты. Углеводы будут рассчитаны автоматически."
+        "Опишите еду с массой в граммах и укажите индивидуальные коэффициенты. "
+        "Если Nightscout подключён, текущая глюкоза будет получена автоматически."
         "</div>",
         unsafe_allow_html=True,
     )
+
+    if nightscout_connected:
+        st.success("Nightscout подключён. Текущая глюкоза будет взята из профиля.")
+    else:
+        st.info(
+            "Для автоматического получения текущей глюкозы подключите Nightscout "
+            "в личном кабинете."
+        )
 
     with st.form("bolus_form"):
         meal_text = st.text_area(
@@ -178,12 +197,13 @@ with calc_tab:
             )
 
         with col_right:
-            current_glucose_mmol = st.number_input(
-                "Текущая глюкоза, ммоль/л",
-                min_value=0.1,
-                value=6.5,
-                step=0.1,
-            )
+            if not nightscout_connected:
+                current_glucose_mmol = st.number_input(
+                    "Текущая глюкоза, ммоль/л",
+                    min_value=0.1,
+                    value=6.5,
+                    step=0.1,
+                )
             target_glucose_mmol = st.number_input(
                 "Целевая глюкоза, ммоль/л",
                 min_value=0.1,
@@ -204,6 +224,19 @@ with calc_tab:
             meal_estimate = estimate_nutrition_from_text(meal_text)
             st.session_state.meal_estimate = meal_estimate
             carbs_g = meal_estimate["total_carbs"]
+
+            if nightscout_connected:
+                try:
+                    glucose_data = fetch_current_glucose(
+                        user_settings["nightscout_url"],
+                        user_settings["nightscout_api_key"],
+                    )
+                except NightscoutError as error:
+                    st.error(str(error))
+                    st.stop()
+
+                st.session_state.nightscout_glucose = glucose_data
+                current_glucose_mmol = glucose_data["glucose_mmol"]
 
         try:
             input_data = BolusInput(
@@ -226,6 +259,25 @@ with calc_tab:
             )
             explanation = generate_explanation(input_data, result, warnings)
             save_calculation(input_data, result, warnings)
+
+            if nightscout_connected and st.session_state.nightscout_glucose:
+                glucose_data = st.session_state.nightscout_glucose
+                st.subheader("Глюкоза из Nightscout")
+                glucose_cols = st.columns(3)
+                glucose_cols[0].metric(
+                    "Текущая глюкоза",
+                    f"{glucose_data['glucose_mmol']} ммоль/л",
+                )
+                glucose_cols[1].metric(
+                    "Nightscout SGV",
+                    f"{glucose_data['glucose_mgdl']:.0f} мг/дл",
+                )
+                glucose_cols[2].metric("Тренд", glucose_data["direction"])
+                if glucose_data["age_minutes"] is not None:
+                    st.caption(
+                        f"Последнее значение получено примерно "
+                        f"{glucose_data['age_minutes']} мин. назад."
+                    )
 
             st.subheader("Распознанная еда")
             if meal_estimate["items"]:
@@ -286,3 +338,60 @@ with history_tab:
         st.dataframe(history_df, use_container_width=True, hide_index=True)
     else:
         st.info("История расчётов пока пуста.")
+
+with account_tab:
+    st.subheader("Личный кабинет")
+    st.markdown(
+        '<div class="diaagent-note">'
+        "Здесь можно активировать доступ к интеграции и привязать Nightscout. "
+        "Ключ сохраняется только в локальной SQLite-базе этого проекта."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.form("account_form"):
+        paid_access_active = st.checkbox(
+            "Платный доступ активен",
+            value=bool(user_settings.get("paid_access_active")),
+        )
+        nightscout_url = st.text_input(
+            "Адрес Nightscout",
+            value=user_settings.get("nightscout_url", ""),
+            placeholder="https://example-nightscout.ru",
+        )
+        nightscout_api_key = st.text_input(
+            "API key / token Nightscout",
+            value=user_settings.get("nightscout_api_key", ""),
+            type="password",
+        )
+        save_account = st.form_submit_button("Сохранить настройки")
+
+    if save_account:
+        save_user_settings(
+            {
+                "paid_access_active": str(paid_access_active).lower(),
+                "nightscout_url": nightscout_url.strip(),
+                "nightscout_api_key": nightscout_api_key.strip(),
+            }
+        )
+        st.success("Настройки сохранены локально. Обновите страницу, чтобы применить их.")
+
+    if user_settings.get("nightscout_url") and user_settings.get("nightscout_api_key"):
+        if st.button("Проверить подключение Nightscout"):
+            try:
+                glucose_data = fetch_current_glucose(
+                    user_settings["nightscout_url"],
+                    user_settings["nightscout_api_key"],
+                )
+            except NightscoutError as error:
+                st.error(str(error))
+            else:
+                st.success(
+                    "Подключение работает. "
+                    f"Последняя глюкоза: {glucose_data['glucose_mmol']} ммоль/л."
+                )
+
+    st.warning(
+        "Не публикуйте API key Nightscout в открытом доступе. Для внешних приложений "
+        "лучше использовать read-only token с ограниченными правами."
+    )
