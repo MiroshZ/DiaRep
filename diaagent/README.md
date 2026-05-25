@@ -70,17 +70,55 @@ total_bolus = meal_bolus + correction_bolus - active_insulin
 
 ## Запуск приложения
 
+Команды запуска выполняются из папки `diaagent`.
+
+Windows:
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
-Команды запуска выполняются из папки `diaagent`.
+macOS / Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+Важно запускать Streamlit через активированное виртуальное окружение или через `python -m streamlit run app.py`. Это помогает не использовать глобальные пакеты Python, которые могут быть установлены для другой архитектуры процессора.
 
 ## Запуск тестов
 
 ```bash
 pytest
+```
+
+## Частая ошибка на macOS
+
+Если при запуске появляется ошибка вида `ImportError: ... pandas_parser ... incompatible architecture`, значит Python запустил `pandas`, установленный для другой архитектуры, например `x86_64` вместо `arm64`.
+
+Для исправления используйте виртуальное окружение проекта:
+
+```bash
+cd diaagent
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+Если окружение уже создано, но ошибка осталась, пересоздайте его:
+
+```bash
+rm -rf .venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m streamlit run app.py
 ```
