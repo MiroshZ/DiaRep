@@ -4,7 +4,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import nutrition  # noqa: E402
-from nutrition import estimate_nutrition_from_text, parse_meal_text  # noqa: E402
+from nutrition import (  # noqa: E402
+    estimate_nutrition_from_text,
+    find_api_slug,
+    product_matches_query,
+    parse_meal_text,
+)
 
 
 def test_parse_meal_text_with_grams() -> None:
@@ -41,3 +46,11 @@ def test_estimate_nutrition_from_text_uses_api_result(monkeypatch) -> None:
     assert result["total_carbs"] == 10
     assert result["total_kcal"] == 50
     assert result["items"][0]["source"] == "Open Food Facts"
+
+
+def test_rice_uses_all_the_nutrients_slug() -> None:
+    assert find_api_slug("рис 100 грамм") == "rice-white-medium-grain-cooked-unenriched"
+
+
+def test_openfoodfacts_rejects_irrelevant_result_name() -> None:
+    assert not product_matches_query("Йогурт TEOS 2%", "рис")

@@ -11,6 +11,7 @@ USER_AGENT = "DiaAgent-MVP/0.1 (nutrition lookup; contact: github.com/MiroshZ/Di
 
 API_SLUG_HINTS = {
     "греч": "buckwheat-groats-roasted-cooked",
+    "рис": "rice-white-medium-grain-cooked-unenriched",
     "банан": "bananas-raw",
     "яблок": "apples-raw-golden-delicious-with-skin",
     "яйц": "egg-whole-cooked-hard-boiled",
@@ -72,6 +73,21 @@ def build_search_queries(query: str) -> list[str]:
             unique_variants.append(variant)
 
     return unique_variants
+
+
+def product_matches_query(product_name: str, query: str) -> bool:
+    """Проверяет, похож ли найденный продукт на исходный запрос."""
+    normalized_name = normalize_food_name(product_name)
+    normalized_query = normalize_food_name(query)
+    if not normalized_name or not normalized_query:
+        return False
+
+    if normalized_query in normalized_name or normalized_name in normalized_query:
+        return True
+
+    query_tokens = set(normalized_query.split())
+    name_tokens = set(normalized_name.split())
+    return bool(query_tokens & name_tokens)
 
 
 def _to_float(value: object, default: float = 0) -> float:
@@ -143,7 +159,7 @@ def fetch_openfoodfacts_food(query: str, timeout_seconds: int = 5) -> dict | Non
             {
                 "search_terms": search_query,
                 "fields": "product_name,product_name_ru,nutriments,url",
-                "page_size": 1,
+                "page_size": 5,
                 "json": 1,
                 "lc": "ru",
             }
@@ -163,27 +179,29 @@ def fetch_openfoodfacts_food(query: str, timeout_seconds: int = 5) -> dict | Non
         if not products:
             continue
 
-        product = products[0]
-        nutriments = product.get("nutriments") or {}
-        carbs_per_100g = nutriments.get("carbohydrates_100g")
-        if carbs_per_100g is None:
-            continue
+        for product in products:
+            nutriments = product.get("nutriments") or {}
+            carbs_per_100g = nutriments.get("carbohydrates_100g")
+            if carbs_per_100g is None:
+                continue
 
-        product_name = (
-            product.get("product_name_ru")
-            or product.get("product_name")
-            or search_query
-        )
+            product_name = (
+                product.get("product_name_ru")
+                or product.get("product_name")
+                or search_query
+            )
+            if not product_matches_query(str(product_name), search_query):
+                continue
 
-        return {
-            "name": str(product_name),
-            "protein_per_100g": _to_float(nutriments.get("proteins_100g")),
-            "fat_per_100g": _to_float(nutriments.get("fat_100g")),
-            "carbs_per_100g": _to_float(carbs_per_100g),
-            "kcal_per_100g": _to_float(nutriments.get("energy-kcal_100g")),
-            "source": "Open Food Facts",
-            "source_url": product.get("url") or "https://ru.openfoodfacts.org/",
-        }
+            return {
+                "name": str(product_name),
+                "protein_per_100g": _to_float(nutriments.get("proteins_100g")),
+                "fat_per_100g": _to_float(nutriments.get("fat_100g")),
+                "carbs_per_100g": _to_float(carbs_per_100g),
+                "kcal_per_100g": _to_float(nutriments.get("energy-kcal_100g")),
+                "source": "Open Food Facts",
+                "source_url": product.get("url") or "https://ru.openfoodfacts.org/",
+            }
 
     return None
 
