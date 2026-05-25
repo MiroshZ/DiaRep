@@ -8,7 +8,7 @@ from calculator import calculate_total_bolus
 from database import get_history, init_db, save_calculation
 from llm_agent import generate_explanation
 from models import BolusInput
-from nutrition import load_foods
+from nutrition import estimate_carbs_from_text, load_foods
 from safety import check_safety
 
 
@@ -16,6 +16,58 @@ def use_estimated_carbs(estimated_carbs: float) -> None:
     """Переносит рассчитанные углеводы в форму болюса."""
     st.session_state.estimated_carbs_g = estimated_carbs
     st.session_state.carbs_g = estimated_carbs
+
+
+def format_meal_items(items: list[dict]) -> pd.DataFrame:
+    """Готовит аккуратную таблицу распознанных продуктов."""
+    return pd.DataFrame(
+        [
+            {
+                "Продукт": item["name"],
+                "Масса, г": item["weight_g"],
+                "Углеводы на 100 г": item["carbs_per_100g"],
+                "Углеводы, г": item["carbs_g"],
+                "Источник": item["source"],
+            }
+            for item in items
+        ]
+    )
+
+
+def format_history(history: list[dict]) -> pd.DataFrame:
+    """Показывает историю в пользовательском виде без служебных полей."""
+    history_df = pd.DataFrame(history)
+    if history_df.empty:
+        return history_df
+
+    history_df = history_df[
+        [
+            "created_at",
+            "carbs_g",
+            "current_glucose_mmol",
+            "target_glucose_mmol",
+            "meal_bolus",
+            "correction_bolus",
+            "active_insulin",
+            "total_bolus",
+        ]
+    ].copy()
+    history_df["created_at"] = pd.to_datetime(history_df["created_at"]).dt.strftime(
+        "%d.%m.%Y %H:%M"
+    )
+
+    return history_df.rename(
+        columns={
+            "created_at": "Дата",
+            "carbs_g": "Углеводы, г",
+            "current_glucose_mmol": "Глюкоза, ммоль/л",
+            "target_glucose_mmol": "Цель, ммоль/л",
+            "meal_bolus": "На еду, ед.",
+            "correction_bolus": "Коррекция, ед.",
+            "active_insulin": "Активный инсулин, ед.",
+            "total_bolus": "Итог, ед.",
+        }
+    )
 
 
 st.set_page_config(
@@ -94,6 +146,9 @@ if "estimated_carbs_g" not in st.session_state:
 
 if "carbs_g" not in st.session_state:
     st.session_state.carbs_g = float(st.session_state.estimated_carbs_g)
+
+if "meal_estimate" not in st.session_state:
+    st.session_state.meal_estimate = None
 
 foods_df = load_foods()
 calc_tab, foods_tab, history_tab = st.tabs(
@@ -186,39 +241,65 @@ with calc_tab:
             st.write(explanation)
 
 with foods_tab:
-    st.subheader("Расчёт углеводов по продукту")
+    st.subheader("Опишите приём пищи")
+    st.markdown(
+        '<div class="diaagent-note">'
+        "Например: гречки 50 грамм, банан 120 г, йогурт 150 г."
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-    food_col, weight_col, result_col = st.columns(3)
-    with food_col:
-        selected_food = st.selectbox("Продукт", foods_df["name"].tolist())
-    with weight_col:
-        weight_g = st.number_input(
-            "Масса продукта, г",
-            min_value=0.0,
-            value=100.0,
-            step=10.0,
+    meal_text = st.text_area(
+        "Что планируется съесть",
+        value="гречки 50 грамм",
+        height=110,
+    )
+
+    if st.button("Оценить углеводы"):
+        with st.spinner("Считаю углеводы по описанию..."):
+            st.session_state.meal_estimate = estimate_carbs_from_text(
+                meal_text,
+                foods_df,
+                use_openfoodfacts=True,
+            )
+
+    if st.session_state.meal_estimate:
+        meal_estimate = st.session_state.meal_estimate
+
+        st.metric("Всего углеводов", f"{meal_estimate['total_carbs']} г")
+
+        if meal_estimate["items"]:
+            meal_items_df = format_meal_items(meal_estimate["items"])
+            st.dataframe(
+                meal_items_df,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            if st.button(
+                "Перенести углеводы в расчёт",
+                on_click=use_estimated_carbs,
+                args=(meal_estimate["total_carbs"],),
+            ):
+                st.success("Количество углеводов перенесено в форму расчёта.")
+
+        if meal_estimate["not_found"]:
+            missing_names = ", ".join(item["query"] for item in meal_estimate["not_found"])
+            st.info(
+                "Не удалось найти углеводы для: "
+                f"{missing_names}. Проверьте название или укажите продукт проще."
+            )
+
+        st.caption(
+            "Часть данных может подбираться из Open Food Facts. Значения стоит "
+            "проверять по упаковке продукта."
         )
-
-    food_row = foods_df.loc[foods_df["name"] == selected_food].iloc[0]
-    estimated_carbs = round(float(food_row["carbs_per_100g"]) * weight_g / 100, 2)
-
-    with result_col:
-        st.metric("Примерные углеводы", f"{estimated_carbs} г")
-        if st.button(
-            "Перенести в расчёт",
-            on_click=use_estimated_carbs,
-            args=(estimated_carbs,),
-        ):
-            st.success("Количество углеводов перенесено в форму расчёта.")
-
-    with st.expander("Таблица продуктов", expanded=True):
-        st.dataframe(foods_df, use_container_width=True, hide_index=True)
 
 with history_tab:
     st.subheader("Последние расчёты")
     history = get_history(limit=20)
     if history:
-        history_df = pd.DataFrame(history)
+        history_df = format_history(history)
         st.dataframe(history_df, use_container_width=True, hide_index=True)
     else:
         st.info("История расчётов пока пуста.")
