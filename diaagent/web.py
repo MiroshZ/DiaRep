@@ -4,13 +4,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from calculator import calculate_total_bolus
 from database import get_history, init_db, save_calculation
+from gemini_agent import GeminiFoodRecognitionError, recognize_food_from_image
 from llm_agent import generate_explanation
 from models import BolusInput
 from nightscout import NightscoutError, fetch_current_glucose
@@ -66,6 +67,18 @@ def nightscout_current(payload: dict) -> dict:
             payload.get("nightscout_api_key", ""),
         )
     except NightscoutError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/recognize-food-photo")
+async def recognize_food_photo(file: UploadFile = File(...)) -> dict:
+    image_bytes = await file.read()
+    try:
+        return recognize_food_from_image(
+            image_bytes,
+            file.content_type or "application/octet-stream",
+        )
+    except GeminiFoodRecognitionError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 

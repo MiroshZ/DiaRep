@@ -5,6 +5,10 @@ const $ = (selector) => document.querySelector(selector);
 const elements = {
   form: $("#calcForm"),
   mealText: $("#mealText"),
+  foodPhoto: $("#foodPhoto"),
+  recognizePhoto: $("#recognizePhoto"),
+  photoPreview: $("#photoPreview"),
+  photoResult: $("#photoResult"),
   ratio: $("#ratio"),
   target: $("#target"),
   correctionFactor: $("#correctionFactor"),
@@ -88,6 +92,18 @@ async function apiRequest(url, options = {}) {
   const response = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     ...options,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.detail || "Запрос не выполнен");
+  }
+  return payload;
+}
+
+async function uploadRequest(url, formData) {
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -228,6 +244,45 @@ async function loadHistory() {
 
 elements.form.addEventListener("submit", calculate);
 elements.useNightscout.addEventListener("change", updateGlucoseMode);
+
+elements.foodPhoto.addEventListener("change", () => {
+  const file = elements.foodPhoto.files?.[0];
+  if (!file) {
+    elements.photoPreview.classList.add("hidden");
+    elements.photoPreview.innerHTML = "";
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  elements.photoPreview.classList.remove("hidden");
+  elements.photoPreview.innerHTML = `<img src="${url}" alt="Фото еды" />`;
+});
+
+elements.recognizePhoto.addEventListener("click", async () => {
+  const file = elements.foodPhoto.files?.[0];
+  if (!file) {
+    showToast("Сначала выберите фото еды.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  elements.photoResult.classList.remove("hidden");
+  elements.photoResult.textContent = "Gemini анализирует фото...";
+
+  try {
+    const result = await uploadRequest("/api/recognize-food-photo", formData);
+    elements.mealText.value = result.meal_text;
+    const rows = result.items
+      .map((item) => `${item.name} — ${item.weight_g} г (${item.confidence})`)
+      .join("; ");
+    elements.photoResult.textContent = `${rows}. ${result.notes || ""}`.trim();
+    showToast("Еда распознана и перенесена в форму.");
+  } catch (error) {
+    elements.photoResult.textContent = "Распознавание не выполнено.";
+    showToast(error.message);
+  }
+});
 
 elements.saveProfile.addEventListener("click", () => {
   saveProfile({

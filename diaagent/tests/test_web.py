@@ -65,3 +65,22 @@ def test_calculate_endpoint(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["result"]["total_bolus"] == 6
+
+
+def test_recognize_food_photo_endpoint(monkeypatch) -> None:
+    def fake_recognize_food_from_image(image_bytes: bytes, mime_type: str) -> dict:
+        return {
+            "items": [{"name": "рис", "weight_g": 150, "confidence": "средняя"}],
+            "meal_text": "рис 150 г",
+            "notes": "примерная оценка",
+            "model": "test-model",
+        }
+
+    monkeypatch.setattr(web, "recognize_food_from_image", fake_recognize_food_from_image)
+    response = client.post(
+        "/api/recognize-food-photo",
+        files={"file": ("food.jpg", b"fake-image", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["meal_text"] == "рис 150 г"
