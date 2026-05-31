@@ -3,11 +3,18 @@
 import base64
 import json
 import os
+from pathlib import Path
 from urllib.request import Request, urlopen
+
+from dotenv import load_dotenv
 
 POLZA_CHAT_COMPLETIONS_URL = "https://polza.ai/api/v1/chat/completions"
 DEFAULT_GEMINI_MODEL = "google/gemini-3.1-flash-lite"
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR.parent / ".env")
 
 
 class GeminiFoodRecognitionError(Exception):
