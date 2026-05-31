@@ -9,6 +9,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: GEMINI_MODEL
-        value: gemini-3.1-flash-lite
-      - key: GEMINI_API_KEY
+        value: google/gemini-3.1-flash-lite
+      - key: POLZA_AI_API_KEY
         sync: false

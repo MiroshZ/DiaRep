@@ -1,12 +1,12 @@
-"""Распознавание еды по фото через Gemini."""
+"""Распознавание еды по фото через Gemini в Polza.ai."""
 
+import base64
 import json
 import os
+from urllib.request import Request, urlopen
 
-from google import genai
-from google.genai import types
-
-DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
+POLZA_CHAT_COMPLETIONS_URL = "https://polza.ai/api/v1/chat/completions"
+DEFAULT_GEMINI_MODEL = "google/gemini-3.1-flash-lite"
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
 
@@ -86,14 +86,15 @@ def recognize_food_from_image(
     if not mime_type.startswith("image/"):
         raise GeminiFoodRecognitionError("Загрузите изображение еды.")
 
-    api_key = api_key or os.getenv("GEMINI_API_KEY")
+    api_key = api_key or os.getenv("POLZA_AI_API_KEY")
     if not api_key:
         raise GeminiFoodRecognitionError(
-            "Не задан GEMINI_API_KEY. Добавьте ключ Gemini API в переменные окружения."
+            "Не задан POLZA_AI_API_KEY. Добавьте ключ Polza.ai в переменные окружения."
         )
 
     model = model or os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
-    client = genai.Client(api_key=api_key)
+    image_base64 = base64.b64encode(image_bytes).decode("ascii")
+    image_url = f"data:{mime_type};base64,{image_base64}"
     prompt = (
         "Ты анализируешь фото еды для приложения подсчёта углеводов. "
         "Определи видимые продукты и примерный вес каждого продукта в граммах. "
@@ -102,20 +103,46 @@ def recognize_food_from_image(
         '{"items":[{"name":"название продукта на русском","weight_g":120,'
         '"confidence":"низкая|средняя|высокая"}],"notes":"короткое пояснение"}'
     )
+    request_payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": image_url, "detail": "low"},
+                    },
+                ],
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 600,
+        "response_format": {"type": "json_object"},
+    }
+    request = Request(
+        POLZA_CHAT_COMPLETIONS_URL,
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
 
     try:
-        response = client.models.generate_content(
-            model=model,
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                prompt,
-            ],
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
+        with urlopen(request, timeout=35) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
     except Exception as error:  # noqa: BLE001
-        raise GeminiFoodRecognitionError(f"Gemini API недоступен: {error}") from error
+        raise GeminiFoodRecognitionError(f"Polza.ai API недоступен: {error}") from error
 
-    payload = _extract_json(response.text or "")
+    choices = response_payload.get("choices") or []
+    if not choices:
+        raise GeminiFoodRecognitionError("Polza.ai вернул ответ без результата.")
+
+    message = choices[0].get("message") or {}
+    payload = _extract_json(str(message.get("content") or ""))
     items = _normalize_items(payload)
     if not items:
         raise GeminiFoodRecognitionError("Не удалось распознать продукты на фото.")

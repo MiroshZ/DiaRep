@@ -3,7 +3,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from gemini_agent import _extract_json, _normalize_items, build_meal_text  # noqa: E402
+import pytest
+
+from gemini_agent import (  # noqa: E402
+    GeminiFoodRecognitionError,
+    _extract_json,
+    _normalize_items,
+    build_meal_text,
+    recognize_food_from_image,
+)
 
 
 def test_extract_json_from_markdown_block() -> None:
@@ -35,3 +43,10 @@ def test_build_meal_text() -> None:
     )
 
     assert meal_text == "рис 150 г, банан 120 г"
+
+
+def test_recognize_food_requires_polza_key(monkeypatch) -> None:
+    monkeypatch.delenv("POLZA_AI_API_KEY", raising=False)
+
+    with pytest.raises(GeminiFoodRecognitionError, match="POLZA_AI_API_KEY"):
+        recognize_food_from_image(b"fake-image", "image/jpeg")
