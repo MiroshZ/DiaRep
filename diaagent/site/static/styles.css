@@ -636,6 +636,22 @@ th {
   margin-top: 24px;
 }
 
+.date-filter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 210px)) auto;
+  gap: 12px;
+  align-items: end;
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfefd;
+}
+
+.date-filter .ghost-button {
+  padding: 0 18px;
+}
+
 .meal-ledger {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -753,6 +769,7 @@ th {
   .form-grid,
   .account-grid,
   .account-overview,
+  .date-filter,
   .photo-recognition,
   .metrics {
     grid-template-columns: 1fr;

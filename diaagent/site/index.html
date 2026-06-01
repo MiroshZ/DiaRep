@@ -276,6 +276,19 @@
                 <p>Последние расчёты с БЖУ, глюкозой и итоговым болюсом.</p>
               </div>
             </div>
+            <div class="date-filter" aria-label="Фильтр журнала по дате">
+              <label class="field">
+                <span>С даты</span>
+                <input id="accountDateFrom" type="date" />
+              </label>
+              <label class="field">
+                <span>По дату</span>
+                <input id="accountDateTo" type="date" />
+              </label>
+              <button id="accountClearDates" class="ghost-button" type="button">
+                Сбросить
+              </button>
+            </div>
             <div id="accountHistoryTable" class="meal-ledger empty">Журнал пока пуст.</div>
           </div>
         </section>
@@ -287,6 +300,19 @@
               <h2>Общий журнал</h2>
               <p>Расчёты, сохранённые на этом сервере.</p>
             </div>
+          </div>
+          <div class="date-filter" aria-label="Фильтр общего журнала по дате">
+            <label class="field">
+              <span>С даты</span>
+              <input id="historyDateFrom" type="date" />
+            </label>
+            <label class="field">
+              <span>По дату</span>
+              <input id="historyDateTo" type="date" />
+            </label>
+            <button id="historyClearDates" class="ghost-button" type="button">
+              Сбросить
+            </button>
           </div>
           <div id="historyTable" class="meal-ledger empty">История пока пуста.</div>
         </section>

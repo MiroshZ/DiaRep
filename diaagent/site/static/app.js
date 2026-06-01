@@ -43,9 +43,17 @@ const elements = {
   warnings: $("#warnings"),
   explanation: $("#explanation"),
   accountHistoryTable: $("#accountHistoryTable"),
+  accountDateFrom: $("#accountDateFrom"),
+  accountDateTo: $("#accountDateTo"),
+  accountClearDates: $("#accountClearDates"),
   historyTable: $("#historyTable"),
+  historyDateFrom: $("#historyDateFrom"),
+  historyDateTo: $("#historyDateTo"),
+  historyClearDates: $("#historyClearDates"),
   toast: $("#toast"),
 };
+
+let historyItems = [];
 
 function showToast(message) {
   elements.toast.textContent = message;
@@ -195,7 +203,7 @@ function renderTable(container, rows, columns) {
 function renderMealLedger(container, rows) {
   if (!rows.length) {
     container.className = "meal-ledger empty";
-    container.textContent = "Журнал пока пуст.";
+    container.textContent = "За выбранный период записей нет.";
     return;
   }
 
@@ -251,6 +259,54 @@ function renderMealLedger(container, rows) {
       <tbody>${body}</tbody>
     </table>
   `;
+}
+
+function parseDateStart(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseDateEnd(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(`${value}T23:59:59.999`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function filterByDate(rows, fromValue, toValue) {
+  const from = parseDateStart(fromValue);
+  const to = parseDateEnd(toValue);
+
+  return rows.filter((item) => {
+    const createdAt = new Date(item.created_at);
+    if (Number.isNaN(createdAt.getTime())) {
+      return false;
+    }
+    if (from && createdAt < from) {
+      return false;
+    }
+    return !(to && createdAt > to);
+  });
+}
+
+function renderFilteredHistory() {
+  const accountRows = filterByDate(
+    historyItems,
+    elements.accountDateFrom.value,
+    elements.accountDateTo.value,
+  );
+  const historyRows = filterByDate(
+    historyItems,
+    elements.historyDateFrom.value,
+    elements.historyDateTo.value,
+  );
+
+  renderMealLedger(elements.accountHistoryTable, accountRows);
+  renderMealLedger(elements.historyTable, historyRows);
 }
 
 function renderResult(payload) {
@@ -331,8 +387,8 @@ async function calculate(event) {
 async function loadHistory() {
   try {
     const payload = await apiRequest("/api/history?limit=12");
-    renderMealLedger(elements.accountHistoryTable, payload.items);
-    renderMealLedger(elements.historyTable, payload.items);
+    historyItems = payload.items;
+    renderFilteredHistory();
   } catch {
     elements.accountHistoryTable.className = "meal-ledger empty";
     elements.accountHistoryTable.textContent = "Журнал недоступен.";
@@ -341,8 +397,24 @@ async function loadHistory() {
   }
 }
 
+function clearDateFilter(fromInput, toInput) {
+  fromInput.value = "";
+  toInput.value = "";
+  renderFilteredHistory();
+}
+
 elements.form.addEventListener("submit", calculate);
 elements.useNightscout.addEventListener("change", updateGlucoseMode);
+elements.accountDateFrom.addEventListener("change", renderFilteredHistory);
+elements.accountDateTo.addEventListener("change", renderFilteredHistory);
+elements.historyDateFrom.addEventListener("change", renderFilteredHistory);
+elements.historyDateTo.addEventListener("change", renderFilteredHistory);
+elements.accountClearDates.addEventListener("click", () => {
+  clearDateFilter(elements.accountDateFrom, elements.accountDateTo);
+});
+elements.historyClearDates.addEventListener("click", () => {
+  clearDateFilter(elements.historyDateFrom, elements.historyDateTo);
+});
 
 elements.foodPhoto.addEventListener("change", () => {
   const file = elements.foodPhoto.files?.[0];
