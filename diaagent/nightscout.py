@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 MGDL_TO_MMOLL = 18.0182
-USER_AGENT = "DiaAgent-MVP/0.1 (Nightscout glucose read)"
+USER_AGENT = "DiaRep/1.0 (Nightscout glucose read)"
 
 
 class NightscoutError(Exception):

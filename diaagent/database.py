@@ -246,7 +246,7 @@ def create_user(
     password: str,
     db_path: str = "diaagent.db",
 ) -> dict:
-    """Создаёт пользователя для MVP личного кабинета."""
+    """Создаёт пользователя для личного кабинета."""
     init_db(db_path)
     path = _resolve_db_path(db_path)
     salt = secrets.token_hex(16)

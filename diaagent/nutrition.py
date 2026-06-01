@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 
 ALL_THE_NUTRIENTS_FOOD_URL = "https://allthenutrients.com/api/v1/foods"
 OPENFOODFACTS_SEARCH_URL = "https://ru.openfoodfacts.org/api/v2/search"
-USER_AGENT = "DiaAgent-MVP/0.1 (nutrition lookup; contact: github.com/MiroshZ/DiaRep)"
+USER_AGENT = "DiaRep/1.0 (nutrition lookup; contact: github.com/MiroshZ/DiaRep)"
 
 API_SLUG_HINTS = {
     "пепперон": "pizza-pepperoni-topping-regular-crust-frozen-cooked",
