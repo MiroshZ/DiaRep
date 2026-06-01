@@ -1,6 +1,30 @@
 """Безопасное объяснение результата расчёта DiaAgent."""
 
+import json
+import os
+from pathlib import Path
 from typing import Any
+from urllib.request import Request, urlopen
+
+from dotenv import load_dotenv
+
+POLZA_CHAT_COMPLETIONS_URL = "https://polza.ai/api/v1/chat/completions"
+DEFAULT_EXPLANATION_MODEL = "google/gemini-3.1-flash-lite"
+FORBIDDEN_MEDICAL_PHRASES = (
+    "вам нужно ввести",
+    "рекомендуется ввести",
+    "сделайте инъекцию",
+    "введите инсулин",
+    "доза для введения",
+)
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR.parent / ".env")
+
+
+class ExplanationAgentError(Exception):
+    """Ошибка безопасного ИИ-объяснения."""
 
 
 def _to_dict(data: Any) -> dict:
@@ -49,13 +73,13 @@ def _nutrition_comment(nutrition: dict | None) -> str:
     return f"{comment}\n\n"
 
 
-def generate_explanation(
+def generate_local_explanation(
     input_data: Any,
     result: dict,
     warnings: list[str],
     nutrition: dict | None = None,
 ) -> str:
-    """Формирует нейтральное объяснение расчёта на русском языке."""
+    """Формирует локальное нейтральное объяснение расчёта на русском языке."""
     data = _to_dict(input_data)
     warnings_text = "\n".join(f"- {warning}" for warning in warnings)
     nutrition_text = _nutrition_comment(nutrition)
@@ -85,3 +109,184 @@ def generate_explanation(
         f"{warnings_text}\n\n"
         "Проверьте данные и обсудите любые изменения лечения с врачом."
     )
+
+
+def _number_variants(value: Any) -> set[str]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return {str(value)}
+
+    variants = {
+        str(value),
+        f"{number:.2f}",
+        f"{number:.1f}",
+        f"{number:g}",
+    }
+    return variants | {variant.replace(".", ",") for variant in variants}
+
+
+def _build_agent_payload(
+    input_data: Any,
+    result: dict,
+    warnings: list[str],
+    nutrition: dict | None,
+) -> dict:
+    data = _to_dict(input_data)
+    nutrition = nutrition or {}
+    return {
+        "input": {
+            "carbs_g": data["carbs_g"],
+            "insulin_to_carb_ratio": data["insulin_to_carb_ratio"],
+            "current_glucose_mmol": data["current_glucose_mmol"],
+            "target_glucose_mmol": data["target_glucose_mmol"],
+            "correction_factor_mmol": data["correction_factor_mmol"],
+            "active_insulin": data.get("active_insulin", 0),
+        },
+        "nutrition": {
+            "items": nutrition.get("items", []),
+            "total_protein": nutrition.get("total_protein", 0),
+            "total_fat": nutrition.get("total_fat", 0),
+            "total_carbs": nutrition.get("total_carbs", data["carbs_g"]),
+            "total_kcal": nutrition.get("total_kcal", 0),
+        },
+        "result": {
+            "meal_bolus": result["meal_bolus"],
+            "correction_bolus": result["correction_bolus"],
+            "active_insulin": result.get("active_insulin", data.get("active_insulin", 0)),
+            "total_bolus": result["total_bolus"],
+        },
+        "formulas": {
+            "meal_bolus": "carbs_g / insulin_to_carb_ratio",
+            "correction_bolus": "max((current_glucose_mmol - target_glucose_mmol) / correction_factor_mmol, 0)",
+            "total_bolus": "max(meal_bolus + correction_bolus - active_insulin, 0)",
+        },
+        "warnings": warnings,
+    }
+
+
+def _build_strict_prompt(payload: dict) -> list[dict]:
+    rules = (
+        "Ты ИИ-агент DiaRep и объясняешь уже выполненный информационный расчёт. "
+        "Строгие правила: не пересчитывай числа самостоятельно; используй только "
+        "готовые значения из JSON; не меняй формулы, единицы измерения и округление; "
+        "не добавляй медицинские назначения; не пиши фразы 'вам нужно ввести', "
+        "'рекомендуется ввести', 'сделайте инъекцию'. Объясняй нейтрально: "
+        "'расчёт показывает', 'модель получила', 'проверьте данные', "
+        "'обсудите с врачом'. Глюкоза только в ммоль/л. "
+        "Белки и жиры можно описывать только как факторы наблюдения, которые могут "
+        "влиять на динамику глюкозы позже, без изменения итогового болюса."
+    )
+    user_prompt = (
+        "Сформируй понятное объяснение на русском языке для блока результата. "
+        "Структура: 1) полученные данные, 2) анализ БЖУ, 3) болюс на еду, "
+        "4) коррекция, 5) итоговый информационный результат, 6) предупреждения. "
+        "Все числовые значения бери только из JSON ниже.\n\n"
+        f"{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+    return [
+        {"role": "system", "content": rules},
+        {"role": "user", "content": user_prompt},
+    ]
+
+
+def _call_polza_chat_completion(
+    messages: list[dict],
+    api_key: str,
+    model: str,
+    timeout_seconds: int = 35,
+) -> str:
+    request_payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0,
+        "max_tokens": 1100,
+    }
+    request = Request(
+        POLZA_CHAT_COMPLETIONS_URL,
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    with urlopen(request, timeout=timeout_seconds) as response:
+        response_payload = json.loads(response.read().decode("utf-8"))
+
+    choices = response_payload.get("choices") or []
+    if not choices:
+        raise ExplanationAgentError("Polza.ai вернул ответ без объяснения.")
+
+    message = choices[0].get("message") or {}
+    text = str(message.get("content") or "").strip()
+    if not text:
+        raise ExplanationAgentError("Polza.ai вернул пустое объяснение.")
+
+    return text
+
+
+def _validate_agent_explanation(text: str, payload: dict) -> None:
+    lowered = text.lower()
+    if any(phrase in lowered for phrase in FORBIDDEN_MEDICAL_PHRASES):
+        raise ExplanationAgentError("ИИ-объяснение содержит медицински опасную фразу.")
+
+    required_values = (
+        payload["result"]["meal_bolus"],
+        payload["result"]["correction_bolus"],
+        payload["result"]["total_bolus"],
+        payload["input"]["carbs_g"],
+    )
+    for value in required_values:
+        if not any(variant in text for variant in _number_variants(value)):
+            raise ExplanationAgentError("ИИ-объяснение не содержит обязательные числа.")
+
+
+def generate_ai_explanation(
+    input_data: Any,
+    result: dict,
+    warnings: list[str],
+    nutrition: dict | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+) -> str:
+    """Формирует объяснение через Gemini в Polza.ai с валидацией результата."""
+    api_key = api_key or os.getenv("POLZA_AI_API_KEY")
+    if not api_key:
+        raise ExplanationAgentError("Не задан POLZA_AI_API_KEY.")
+
+    model = model or os.getenv(
+        "DIAAGENT_EXPLANATION_MODEL",
+        os.getenv("GEMINI_MODEL", DEFAULT_EXPLANATION_MODEL),
+    )
+    payload = _build_agent_payload(input_data, result, warnings, nutrition)
+    messages = _build_strict_prompt(payload)
+
+    try:
+        text = _call_polza_chat_completion(messages, api_key, model)
+    except Exception as error:  # noqa: BLE001
+        raise ExplanationAgentError(f"ИИ-объяснение недоступно: {error}") from error
+
+    _validate_agent_explanation(text, payload)
+    return text
+
+
+def generate_explanation(
+    input_data: Any,
+    result: dict,
+    warnings: list[str],
+    nutrition: dict | None = None,
+) -> str:
+    """Формирует объяснение через ИИ-агента с безопасным локальным fallback."""
+    if os.getenv("DIAAGENT_DISABLE_AI_EXPLANATION", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return generate_local_explanation(input_data, result, warnings, nutrition)
+
+    try:
+        return generate_ai_explanation(input_data, result, warnings, nutrition)
+    except ExplanationAgentError:
+        return generate_local_explanation(input_data, result, warnings, nutrition)
