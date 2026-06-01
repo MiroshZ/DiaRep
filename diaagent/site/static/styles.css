@@ -495,7 +495,7 @@ select {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
 }
 
@@ -605,6 +605,93 @@ th {
   padding: 0 18px;
 }
 
+.account-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.account-overview article {
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #f7fbfa);
+}
+
+.account-overview span,
+.account-overview small {
+  display: block;
+  color: var(--muted);
+}
+
+.account-overview strong {
+  display: block;
+  margin: 9px 0 7px;
+  font-size: 1.35rem;
+}
+
+.cabinet-history {
+  margin-top: 24px;
+}
+
+.meal-ledger {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.meal-ledger.empty {
+  padding: 18px;
+  color: var(--muted);
+  background: #fbfefd;
+}
+
+.meal-ledger td {
+  vertical-align: top;
+}
+
+.meal-ledger td strong,
+.meal-ledger td small {
+  display: block;
+}
+
+.meal-ledger td small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.meal-cell {
+  min-width: 220px;
+  white-space: normal;
+}
+
+.macro-chip {
+  display: inline-flex;
+  margin: 0 5px 5px 0;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.macro-chip.protein {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.macro-chip.fat {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.macro-chip.carbs {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .toast {
   position: fixed;
   right: 22px;
@@ -665,6 +752,7 @@ th {
   .nav,
   .form-grid,
   .account-grid,
+  .account-overview,
   .photo-recognition,
   .metrics {
     grid-template-columns: 1fr;

@@ -22,10 +22,19 @@ const elements = {
   nightscoutKey: $("#nightscoutKey"),
   saveProfile: $("#saveProfile"),
   testNightscout: $("#testNightscout"),
+  applyProfile: $("#applyProfile"),
+  accountRatio: $("#accountRatio"),
+  accountTarget: $("#accountTarget"),
+  accountCorrectionFactor: $("#accountCorrectionFactor"),
+  accessCard: $("#accessCard"),
+  nightscoutCard: $("#nightscoutCard"),
+  lastGlucoseCard: $("#lastGlucoseCard"),
+  lastGlucoseHint: $("#lastGlucoseHint"),
   proteinMetric: $("#proteinMetric"),
   fatMetric: $("#fatMetric"),
   carbsMetric: $("#carbsMetric"),
   bolusMetric: $("#bolusMetric"),
+  kcalMetric: $("#kcalMetric"),
   heroBolus: $("#heroBolus"),
   heroCarbs: $("#heroCarbs"),
   resultHint: $("#resultHint"),
@@ -33,6 +42,7 @@ const elements = {
   foodTable: $("#foodTable"),
   warnings: $("#warnings"),
   explanation: $("#explanation"),
+  accountHistoryTable: $("#accountHistoryTable"),
   historyTable: $("#historyTable"),
   toast: $("#toast"),
 };
@@ -55,11 +65,43 @@ function saveProfile(profile) {
   localStorage.setItem(profileKey, JSON.stringify(profile));
 }
 
+function formatNumber(value, digits = 1) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "—";
+  }
+  return number.toLocaleString("ru-RU", {
+    maximumFractionDigits: digits,
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function loadProfile() {
   const profile = getProfile();
   elements.paidAccess.value = String(Boolean(profile.paidAccess));
   elements.nightscoutUrl.value = profile.nightscoutUrl || "";
   elements.nightscoutKey.value = profile.nightscoutKey || "";
+  elements.accountRatio.value = profile.insulinToCarbRatio || elements.ratio.value;
+  elements.accountTarget.value = profile.targetGlucoseMmol || elements.target.value;
+  elements.accountCorrectionFactor.value =
+    profile.correctionFactorMmol || elements.correctionFactor.value;
+  if (profile.insulinToCarbRatio) {
+    elements.ratio.value = profile.insulinToCarbRatio;
+  }
+  if (profile.targetGlucoseMmol) {
+    elements.target.value = profile.targetGlucoseMmol;
+  }
+  if (profile.correctionFactorMmol) {
+    elements.correctionFactor.value = profile.correctionFactorMmol;
+  }
   elements.useNightscout.checked = Boolean(
     profile.paidAccess && profile.nightscoutUrl && profile.nightscoutKey,
   );
@@ -74,6 +116,19 @@ function profileReady() {
 
 function updateProfileStatus() {
   const dot = document.querySelector(".status-dot");
+  const profile = getProfile();
+  elements.accessCard.textContent = profile.paidAccess ? "Активен" : "Не активен";
+  elements.nightscoutCard.textContent = profileReady() ? "Подключён" : "Не подключён";
+  if (profile.lastGlucoseMmol) {
+    elements.lastGlucoseCard.textContent = `${profile.lastGlucoseMmol} ммоль/л`;
+    elements.lastGlucoseHint.textContent = profile.lastGlucoseAt
+      ? `Обновлено ${new Date(profile.lastGlucoseAt).toLocaleString("ru-RU")}`
+      : "Получено из Nightscout";
+  } else {
+    elements.lastGlucoseCard.textContent = "—";
+    elements.lastGlucoseHint.textContent = "Проверка ещё не выполнялась";
+  }
+
   if (profileReady()) {
     elements.profileStatus.textContent = "Nightscout подключён";
     dot.classList.add("active");
@@ -127,7 +182,7 @@ function renderTable(container, rows, columns) {
   const body = rows
     .map((row) => {
       const cells = columns
-        .map((column) => `<td>${row[column.key] ?? "—"}</td>`)
+        .map((column) => `<td>${escapeHtml(row[column.key] ?? "—")}</td>`)
         .join("");
       return `<tr>${cells}</tr>`;
     })
@@ -135,6 +190,67 @@ function renderTable(container, rows, columns) {
 
   container.className = "food-table";
   container.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function renderMealLedger(container, rows) {
+  if (!rows.length) {
+    container.className = "meal-ledger empty";
+    container.textContent = "Журнал пока пуст.";
+    return;
+  }
+
+  const body = rows
+    .map((item) => {
+      const createdAt = new Date(item.created_at).toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const source =
+        item.glucose_source === "nightscout" ? "Nightscout" : "Вручную";
+
+      return `
+        <tr>
+          <td>
+            <strong>${escapeHtml(createdAt)}</strong>
+            <small>${escapeHtml(source)}</small>
+          </td>
+          <td class="meal-cell">
+            <strong>${escapeHtml(item.meal_text || "Приём пищи")}</strong>
+            <small>${formatNumber(item.kcal, 0)} ккал</small>
+          </td>
+          <td>
+            <span class="macro-chip protein">Б ${formatNumber(item.protein_g)} г</span>
+            <span class="macro-chip fat">Ж ${formatNumber(item.fat_g)} г</span>
+            <span class="macro-chip carbs">У ${formatNumber(item.carbs_g)} г</span>
+          </td>
+          <td>${formatNumber(item.current_glucose_mmol)} ммоль/л</td>
+          <td>${formatNumber(item.meal_bolus)} ед.</td>
+          <td>${formatNumber(item.correction_bolus)} ед.</td>
+          <td><strong>${formatNumber(item.total_bolus)} ед.</strong></td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  container.className = "meal-ledger";
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Время</th>
+          <th>Болюс еды</th>
+          <th>БЖУ</th>
+          <th>Глюкоза</th>
+          <th>Еда</th>
+          <th>Коррекция</th>
+          <th>Итог</th>
+        </tr>
+      </thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
 }
 
 function renderResult(payload) {
@@ -145,6 +261,7 @@ function renderResult(payload) {
   elements.fatMetric.textContent = `${nutrition.total_fat} г`;
   elements.carbsMetric.textContent = `${nutrition.total_carbs} г`;
   elements.bolusMetric.textContent = `${result.total_bolus} ед.`;
+  elements.kcalMetric.textContent = `${nutrition.total_kcal} ккал`;
   elements.heroBolus.textContent = `${result.total_bolus} ед.`;
   elements.heroCarbs.textContent = `${nutrition.total_carbs} г углеводов`;
   elements.resultHint.textContent = "Расчёт выполнен.";
@@ -214,30 +331,12 @@ async function calculate(event) {
 async function loadHistory() {
   try {
     const payload = await apiRequest("/api/history?limit=12");
-    const rows = payload.items.map((item) => ({
-      created_at: new Date(item.created_at).toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      carbs_g: item.carbs_g,
-      current_glucose_mmol: item.current_glucose_mmol,
-      meal_bolus: item.meal_bolus,
-      correction_bolus: item.correction_bolus,
-      total_bolus: item.total_bolus,
-    }));
-
-    renderTable(elements.historyTable, rows, [
-      { key: "created_at", label: "Дата" },
-      { key: "carbs_g", label: "Углеводы" },
-      { key: "current_glucose_mmol", label: "Глюкоза" },
-      { key: "meal_bolus", label: "На еду" },
-      { key: "correction_bolus", label: "Коррекция" },
-      { key: "total_bolus", label: "Итог" },
-    ]);
+    renderMealLedger(elements.accountHistoryTable, payload.items);
+    renderMealLedger(elements.historyTable, payload.items);
   } catch {
-    elements.historyTable.className = "food-table empty";
+    elements.accountHistoryTable.className = "meal-ledger empty";
+    elements.accountHistoryTable.textContent = "Журнал недоступен.";
+    elements.historyTable.className = "meal-ledger empty";
     elements.historyTable.textContent = "История недоступна.";
   }
 }
@@ -285,13 +384,26 @@ elements.recognizePhoto.addEventListener("click", async () => {
 });
 
 elements.saveProfile.addEventListener("click", () => {
+  const currentProfile = getProfile();
   saveProfile({
+    ...currentProfile,
     paidAccess: elements.paidAccess.value === "true",
     nightscoutUrl: elements.nightscoutUrl.value.trim(),
     nightscoutKey: elements.nightscoutKey.value.trim(),
+    insulinToCarbRatio: numberValue(elements.accountRatio),
+    targetGlucoseMmol: numberValue(elements.accountTarget),
+    correctionFactorMmol: numberValue(elements.accountCorrectionFactor),
   });
   loadProfile();
   showToast("Профиль сохранён в браузере.");
+});
+
+elements.applyProfile.addEventListener("click", () => {
+  elements.ratio.value = elements.accountRatio.value || elements.ratio.value;
+  elements.target.value = elements.accountTarget.value || elements.target.value;
+  elements.correctionFactor.value =
+    elements.accountCorrectionFactor.value || elements.correctionFactor.value;
+  showToast("Коэффициенты подставлены в форму.");
 });
 
 elements.testNightscout.addEventListener("click", async () => {
@@ -309,6 +421,13 @@ elements.testNightscout.addEventListener("click", async () => {
         nightscout_api_key: profile.nightscoutKey,
       }),
     });
+    saveProfile({
+      ...profile,
+      lastGlucoseMmol: result.glucose_mmol,
+      lastGlucoseAt: new Date().toISOString(),
+      lastGlucoseDirection: result.direction,
+    });
+    updateProfileStatus();
     showToast(`Nightscout работает: ${result.glucose_mmol} ммоль/л.`);
   } catch (error) {
     showToast(error.message);

@@ -177,6 +177,10 @@
                 <span>Итоговый болюс</span>
                 <strong id="bolusMetric">—</strong>
               </article>
+              <article>
+                <span>Ккал</span>
+                <strong id="kcalMetric">—</strong>
+              </article>
             </div>
 
             <div id="glucoseCard" class="glucose-card hidden"></div>
@@ -191,8 +195,26 @@
             <span>04</span>
             <div>
               <h2>Личный кабинет</h2>
-              <p>Данные профиля хранятся в браузере и не попадают в git.</p>
+              <p>Профиль, Nightscout и журнал приёмов пищи.</p>
             </div>
+          </div>
+
+          <div class="account-overview">
+            <article>
+              <span>Доступ</span>
+              <strong id="accessCard">Не активен</strong>
+              <small>Включает личные интеграции</small>
+            </article>
+            <article>
+              <span>Nightscout</span>
+              <strong id="nightscoutCard">Не подключён</strong>
+              <small>Текущая глюкоза для расчёта</small>
+            </article>
+            <article>
+              <span>Последняя глюкоза</span>
+              <strong id="lastGlucoseCard">—</strong>
+              <small id="lastGlucoseHint">Проверка ещё не выполнялась</small>
+            </article>
           </div>
 
           <div class="account-grid">
@@ -213,24 +235,60 @@
             </label>
           </div>
 
+          <div class="section-heading compact">
+            <span>06</span>
+            <div>
+              <h2>Личные коэффициенты</h2>
+              <p>Сохраняются только в браузере и подставляются в форму расчёта.</p>
+            </div>
+          </div>
+
+          <div class="account-grid">
+            <label class="field">
+              <span>Углеводный коэффициент</span>
+              <input id="accountRatio" type="number" min="0.1" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Целевая глюкоза, ммоль/л</span>
+              <input id="accountTarget" type="number" min="0.1" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Фактор чувствительности</span>
+              <input id="accountCorrectionFactor" type="number" min="0.1" step="0.1" />
+            </label>
+          </div>
+
           <div class="actions">
             <button id="saveProfile" class="secondary-button" type="button">Сохранить профиль</button>
+            <button id="applyProfile" class="ghost-button" type="button">Подставить коэффициенты</button>
             <button id="testNightscout" class="ghost-button" type="button">Проверить Nightscout</button>
           </div>
           <p class="small-note">
             Для внешних приложений лучше использовать read-only token с ограниченными правами.
+            Ключ Nightscout хранится в браузере и отправляется на сервер только для запроса текущей глюкозы.
           </p>
+
+          <div class="cabinet-history">
+            <div class="section-heading compact">
+              <span>07</span>
+              <div>
+                <h2>Приёмы пищи и болюсы</h2>
+                <p>Последние расчёты с БЖУ, глюкозой и итоговым болюсом.</p>
+              </div>
+            </div>
+            <div id="accountHistoryTable" class="meal-ledger empty">Журнал пока пуст.</div>
+          </div>
         </section>
 
         <section id="history" class="panel">
           <div class="section-heading">
-            <span>05</span>
+            <span>08</span>
             <div>
-              <h2>История</h2>
-              <p>Последние расчёты на этом сервере.</p>
+              <h2>Общий журнал</h2>
+              <p>Расчёты, сохранённые на этом сервере.</p>
             </div>
           </div>
-          <div id="historyTable" class="food-table empty">История пока пуста.</div>
+          <div id="historyTable" class="meal-ledger empty">История пока пуста.</div>
         </section>
       </main>
     </div>

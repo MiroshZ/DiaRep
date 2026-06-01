@@ -118,8 +118,15 @@ def calculate(payload: BolusRequest) -> dict:
         result["total_bolus"],
         input_data.carbs_g,
     )
-    explanation = generate_explanation(input_data, result, warnings)
-    save_calculation(input_data, result, warnings)
+    explanation = generate_explanation(input_data, result, warnings, nutrition)
+    save_calculation(
+        input_data,
+        result,
+        warnings,
+        meal_text=payload.meal_text,
+        nutrition=nutrition,
+        glucose_source="nightscout" if payload.use_nightscout else "manual",
+    )
 
     return {
         "input": input_data.model_dump(),

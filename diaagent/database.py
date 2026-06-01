@@ -36,6 +36,7 @@ def init_db(db_path: str = "diaagent.db") -> None:
             )
             """
         )
+        _ensure_calculation_columns(connection)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS user_settings (
@@ -45,6 +46,25 @@ def init_db(db_path: str = "diaagent.db") -> None:
             """
         )
         connection.commit()
+
+
+def _ensure_calculation_columns(connection: sqlite3.Connection) -> None:
+    """Добавляет новые поля истории без удаления старых расчётов."""
+    rows = connection.execute("PRAGMA table_info(calculations)").fetchall()
+    existing_columns = {row[1] for row in rows}
+    columns = {
+        "meal_text": "TEXT DEFAULT ''",
+        "protein_g": "REAL DEFAULT 0",
+        "fat_g": "REAL DEFAULT 0",
+        "kcal": "REAL DEFAULT 0",
+        "glucose_source": "TEXT DEFAULT 'manual'",
+    }
+
+    for column, definition in columns.items():
+        if column not in existing_columns:
+            connection.execute(
+                f"ALTER TABLE calculations ADD COLUMN {column} {definition}"
+            )
 
 
 def _to_dict(data: Any) -> dict:
@@ -59,11 +79,15 @@ def save_calculation(
     data: Any,
     result: dict,
     warnings: list[str],
+    meal_text: str = "",
+    nutrition: dict | None = None,
+    glucose_source: str = "manual",
     db_path: str = "diaagent.db",
 ) -> None:
     """Сохраняет один учебный расчёт в SQLite."""
     init_db(db_path)
     input_data = _to_dict(data)
+    nutrition = nutrition or {}
     path = _resolve_db_path(db_path)
 
     with sqlite3.connect(path) as connection:
@@ -71,7 +95,11 @@ def save_calculation(
             """
             INSERT INTO calculations (
                 created_at,
+                meal_text,
                 carbs_g,
+                protein_g,
+                fat_g,
+                kcal,
                 insulin_to_carb_ratio,
                 current_glucose_mmol,
                 target_glucose_mmol,
@@ -80,13 +108,18 @@ def save_calculation(
                 meal_bolus,
                 correction_bolus,
                 total_bolus,
+                glucose_source,
                 warnings
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 datetime.now().isoformat(timespec="seconds"),
+                meal_text,
                 input_data["carbs_g"],
+                nutrition.get("total_protein", 0),
+                nutrition.get("total_fat", 0),
+                nutrition.get("total_kcal", 0),
                 input_data["insulin_to_carb_ratio"],
                 input_data["current_glucose_mmol"],
                 input_data["target_glucose_mmol"],
@@ -95,6 +128,7 @@ def save_calculation(
                 result["meal_bolus"],
                 result["correction_bolus"],
                 result["total_bolus"],
+                glucose_source,
                 json.dumps(warnings, ensure_ascii=False),
             ),
         )
@@ -113,7 +147,11 @@ def get_history(limit: int = 20, db_path: str = "diaagent.db") -> list[dict]:
             SELECT
                 id,
                 created_at,
+                meal_text,
                 carbs_g,
+                protein_g,
+                fat_g,
+                kcal,
                 insulin_to_carb_ratio,
                 current_glucose_mmol,
                 target_glucose_mmol,
@@ -122,6 +160,7 @@ def get_history(limit: int = 20, db_path: str = "diaagent.db") -> list[dict]:
                 meal_bolus,
                 correction_bolus,
                 total_bolus,
+                glucose_source,
                 warnings
             FROM calculations
             ORDER BY id DESC
