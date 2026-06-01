@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DiaAgent</title>
+    <title>DiaRep — о сайте</title>
     <link rel="icon" href="/static/logo-mark.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,326 +13,95 @@
     />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>
+  <body data-page="home">
     <div class="app-shell">
       <header class="mobile-header">
-        <a class="brand" href="#home" aria-label="DiaAgent">
-          <span class="brand-mark">
-            <img src="/static/logo-mark.png" alt="" />
-          </span>
-          <span>
-            <strong>DiaRep</strong>
-            <small>Питание и болюс</small>
-          </span>
+        <a class="brand" href="/" aria-label="DiaRep">
+          <span class="brand-mark"><img src="/static/logo-mark.png" alt="" /></span>
+          <span><strong>DiaRep</strong><small>Питание и болюс</small></span>
         </a>
         <button id="menuToggle" class="menu-toggle" type="button" aria-label="Открыть меню">
-          <span></span>
-          <span></span>
-          <span></span>
+          <span></span><span></span><span></span>
         </button>
       </header>
 
       <aside class="sidebar">
-        <a class="brand" href="#home" aria-label="DiaAgent">
-          <span class="brand-mark">
-            <img src="/static/logo-mark.png" alt="" />
-          </span>
-          <span>
-            <strong>DiaRep</strong>
-            <small>Питание и болюс</small>
-          </span>
+        <a class="brand" href="/" aria-label="DiaRep">
+          <span class="brand-mark"><img src="/static/logo-mark.png" alt="" /></span>
+          <span><strong>DiaRep</strong><small>Питание и болюс</small></span>
         </a>
-
         <nav class="nav">
-          <a href="#home" data-route="home">Главная</a>
-          <a href="#calculate" data-route="calculate">Расчёт</a>
-          <a href="#account" data-route="account">Личный кабинет</a>
-          <a href="#history" data-route="history">Журнал</a>
-          <a href="#safety" data-route="safety">Безопасность</a>
+          <a href="/" data-route="home">О сайте</a>
+          <a href="/calculator" data-route="calculator">Калькулятор</a>
+          <a href="/account" data-route="account">Личный кабинет</a>
+          <a href="/journal" data-route="journal">Журнал</a>
         </nav>
-
         <div class="sidebar-panel">
           <span class="status-dot"></span>
-          <p id="profileStatus">Nightscout не подключён</p>
+          <p id="profileStatus">Вход не выполнен</p>
         </div>
       </aside>
 
-      <main id="top" class="content">
-        <section id="home" class="hero page active" data-page="home">
+      <main class="content">
+        <section class="hero">
           <div class="hero-copy">
             <div class="hero-brand">
               <img src="/static/logo-mark.png" alt="" />
               <span>DiaRep</span>
             </div>
-            <span class="eyebrow">персональный расчёт</span>
-            <h1>Расчёт болюса без лишних таблиц</h1>
+            <span class="eyebrow">персональный анализ питания</span>
+            <h1>Еда, глюкоза и расчёты в одном месте</h1>
             <p>
-              Опишите еду обычным языком, подключите Nightscout при необходимости
-              и получите понятный расчёт по вашим индивидуальным параметрам.
+              DiaRep помогает описать приём пищи, оценить БЖУ через внешние
+              источники, распознать еду по фото через Gemini и выполнить
+              информационный расчёт болюса по индивидуальным коэффициентам.
             </p>
           </div>
-          <div class="hero-card" aria-label="Сводка">
-            <span>Последний расчёт</span>
-            <strong id="heroBolus">—</strong>
-            <small id="heroCarbs">Углеводы пока не рассчитаны</small>
+          <div class="hero-card" aria-label="Быстрый старт">
+            <span>Начните с калькулятора</span>
+            <strong>БЖУ + болюс</strong>
+            <small>Результат сохраняется в личный журнал после входа.</small>
           </div>
         </section>
 
-        <section id="safety" class="notice page" data-page="safety">
+        <section class="notice">
           <strong>Важно:</strong>
-          приложение не является медицинским изделием. Расчёт не является
-          медицинской рекомендацией, не заменяет врача и должен использовать
-          только индивидуальные параметры, которые вы уже получили от
-          медицинского специалиста.
+          сайт не является медицинским изделием. Расчёт не является медицинской
+          рекомендацией, не заменяет врача и использует только параметры, которые
+          пользователь уже получил от медицинского специалиста.
         </section>
 
-        <section id="calculate" class="grid two-columns page" data-page="calculate">
-          <form id="calcForm" class="panel form-panel">
+        <section class="grid info-grid">
+          <article class="panel">
             <div class="section-heading">
               <span>01</span>
               <div>
-                <h2>Еда и глюкоза</h2>
-                <p>Например: рис 150 г, банан 120 г.</p>
+                <h2>Калькулятор</h2>
+                <p>Опишите еду текстом или загрузите фото, затем выполните расчёт.</p>
               </div>
             </div>
-
-            <label class="field full">
-              <span>Что планируется съесть</span>
-              <textarea
-                id="mealText"
-                rows="4"
-                placeholder="рис 150 г, куриная грудка 120 г"
-              >рис 150 г</textarea>
-            </label>
-
-            <div class="photo-recognition">
-              <div>
-                <strong>Распознать по фото</strong>
-                <small>Gemini оценит продукты и примерный вес, затем заполнит поле еды.</small>
-              </div>
-              <label class="upload-button">
-                <input id="foodPhoto" type="file" accept="image/*" />
-                Выбрать фото
-              </label>
-              <button id="recognizePhoto" class="ghost-button" type="button">
-                Распознать
-              </button>
-            </div>
-            <div id="photoPreview" class="photo-preview hidden"></div>
-            <div id="photoResult" class="photo-result hidden"></div>
-
-            <div class="switch-row">
-              <div>
-                <strong>Использовать Nightscout</strong>
-                <small>Если профиль подключён, сахар будет подставлен автоматически.</small>
-              </div>
-              <label class="switch">
-                <input id="useNightscout" type="checkbox" />
-                <span></span>
-              </label>
-            </div>
-
-            <label id="manualGlucoseField" class="field">
-              <span>Текущая глюкоза, ммоль/л</span>
-              <input id="currentGlucose" type="number" min="0.1" step="0.1" value="6.5" />
-            </label>
-
-            <div class="section-heading compact">
+            <a class="secondary-link" href="/calculator">Открыть калькулятор</a>
+          </article>
+          <article class="panel">
+            <div class="section-heading">
               <span>02</span>
               <div>
-                <h2>Коэффициенты</h2>
-                <p>Используйте только параметры от специалиста.</p>
+                <h2>Личный кабинет</h2>
+                <p>Зарегистрируйтесь, сохраните коэффициенты и привяжите Nightscout.</p>
               </div>
             </div>
-
-            <div class="form-grid">
-              <label class="field">
-                <span>Углеводный коэффициент</span>
-                <input id="ratio" type="number" min="0.1" step="0.1" value="12" />
-              </label>
-              <label class="field">
-                <span>Целевая глюкоза, ммоль/л</span>
-                <input id="target" type="number" min="0.1" step="0.1" value="6" />
-              </label>
-              <label class="field">
-                <span>Фактор чувствительности</span>
-                <input id="correctionFactor" type="number" min="0.1" step="0.1" value="2" />
-              </label>
-              <label class="field">
-                <span>Активный инсулин, ед.</span>
-                <input id="activeInsulin" type="number" min="0" step="0.1" value="0" />
-              </label>
-            </div>
-
-            <button class="primary-button" type="submit">
-              Рассчитать
-            </button>
-          </form>
-
-          <section class="panel result-panel">
+            <a class="secondary-link" href="/account">Войти или зарегистрироваться</a>
+          </article>
+          <article class="panel">
             <div class="section-heading">
               <span>03</span>
               <div>
-                <h2>Результат</h2>
-                <p id="resultHint">Заполните форму и запустите расчёт.</p>
+                <h2>Журнал</h2>
+                <p>Смотрите историю приёмов пищи, БЖУ, глюкозы и болюсов.</p>
               </div>
             </div>
-
-            <div class="metrics">
-              <article>
-                <span>Белки</span>
-                <strong id="proteinMetric">—</strong>
-              </article>
-              <article>
-                <span>Жиры</span>
-                <strong id="fatMetric">—</strong>
-              </article>
-              <article>
-                <span>Углеводы</span>
-                <strong id="carbsMetric">—</strong>
-              </article>
-              <article>
-                <span>Итоговый болюс</span>
-                <strong id="bolusMetric">—</strong>
-              </article>
-              <article>
-                <span>Ккал</span>
-                <strong id="kcalMetric">—</strong>
-              </article>
-            </div>
-
-            <div id="glucoseCard" class="glucose-card hidden"></div>
-            <div id="foodTable" class="food-table empty">Распознанные продукты появятся здесь.</div>
-            <div id="warnings" class="warnings"></div>
-            <pre id="explanation" class="explanation"></pre>
-          </section>
-        </section>
-
-        <section id="account" class="panel page" data-page="account">
-          <div class="section-heading">
-            <span>04</span>
-            <div>
-              <h2>Личный кабинет</h2>
-              <p>Профиль, Nightscout и журнал приёмов пищи.</p>
-            </div>
-          </div>
-
-          <div class="account-overview">
-            <article>
-              <span>Доступ</span>
-              <strong id="accessCard">Не активен</strong>
-              <small>Включает личные интеграции</small>
-            </article>
-            <article>
-              <span>Nightscout</span>
-              <strong id="nightscoutCard">Не подключён</strong>
-              <small>Текущая глюкоза для расчёта</small>
-            </article>
-            <article>
-              <span>Последняя глюкоза</span>
-              <strong id="lastGlucoseCard">—</strong>
-              <small id="lastGlucoseHint">Проверка ещё не выполнялась</small>
-            </article>
-          </div>
-
-          <div class="account-grid">
-            <label class="field">
-              <span>Статус доступа</span>
-              <select id="paidAccess">
-                <option value="false">Не активен</option>
-                <option value="true">Активен</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Nightscout URL</span>
-              <input id="nightscoutUrl" type="url" placeholder="https://example-nightscout.ru" />
-            </label>
-            <label class="field">
-              <span>API key / read-only token</span>
-              <input id="nightscoutKey" type="password" autocomplete="off" />
-            </label>
-          </div>
-
-          <div class="section-heading compact">
-            <span>06</span>
-            <div>
-              <h2>Личные коэффициенты</h2>
-              <p>Сохраняются только в браузере и подставляются в форму расчёта.</p>
-            </div>
-          </div>
-
-          <div class="account-grid">
-            <label class="field">
-              <span>Углеводный коэффициент</span>
-              <input id="accountRatio" type="number" min="0.1" step="0.1" />
-            </label>
-            <label class="field">
-              <span>Целевая глюкоза, ммоль/л</span>
-              <input id="accountTarget" type="number" min="0.1" step="0.1" />
-            </label>
-            <label class="field">
-              <span>Фактор чувствительности</span>
-              <input id="accountCorrectionFactor" type="number" min="0.1" step="0.1" />
-            </label>
-          </div>
-
-          <div class="actions">
-            <button id="saveProfile" class="secondary-button" type="button">Сохранить профиль</button>
-            <button id="applyProfile" class="ghost-button" type="button">Подставить коэффициенты</button>
-            <button id="testNightscout" class="ghost-button" type="button">Проверить Nightscout</button>
-          </div>
-          <p class="small-note">
-            Для внешних приложений лучше использовать read-only token с ограниченными правами.
-            Ключ Nightscout хранится в браузере и отправляется на сервер только для запроса текущей глюкозы.
-          </p>
-
-          <div class="cabinet-history">
-            <div class="section-heading compact">
-              <span>07</span>
-              <div>
-                <h2>Приёмы пищи и болюсы</h2>
-                <p>Последние расчёты с БЖУ, глюкозой и итоговым болюсом.</p>
-              </div>
-            </div>
-            <div class="date-filter" aria-label="Фильтр журнала по дате">
-              <label class="field">
-                <span>С даты</span>
-                <input id="accountDateFrom" type="date" />
-              </label>
-              <label class="field">
-                <span>По дату</span>
-                <input id="accountDateTo" type="date" />
-              </label>
-              <button id="accountClearDates" class="ghost-button" type="button">
-                Сбросить
-              </button>
-            </div>
-            <div id="accountHistoryTable" class="meal-ledger empty">Журнал пока пуст.</div>
-          </div>
-        </section>
-
-        <section id="history" class="panel page" data-page="history">
-          <div class="section-heading">
-            <span>08</span>
-            <div>
-              <h2>Общий журнал</h2>
-              <p>Расчёты, сохранённые на этом сервере.</p>
-            </div>
-          </div>
-          <div class="date-filter" aria-label="Фильтр общего журнала по дате">
-            <label class="field">
-              <span>С даты</span>
-              <input id="historyDateFrom" type="date" />
-            </label>
-            <label class="field">
-              <span>По дату</span>
-              <input id="historyDateTo" type="date" />
-            </label>
-            <button id="historyClearDates" class="ghost-button" type="button">
-              Сбросить
-            </button>
-          </div>
-          <div id="historyTable" class="meal-ledger empty">История пока пуста.</div>
+            <a class="secondary-link" href="/journal">Перейти в журнал</a>
+          </article>
         </section>
       </main>
     </div>

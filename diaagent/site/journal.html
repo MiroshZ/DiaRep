@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DiaRep — журнал</title>
+    <link rel="icon" href="/static/logo-mark.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="journal">
+    <div class="app-shell">
+      <header class="mobile-header">
+        <a class="brand" href="/" aria-label="DiaRep">
+          <span class="brand-mark"><img src="/static/logo-mark.png" alt="" /></span>
+          <span><strong>DiaRep</strong><small>Питание и болюс</small></span>
+        </a>
+        <button id="menuToggle" class="menu-toggle" type="button" aria-label="Открыть меню">
+          <span></span><span></span><span></span>
+        </button>
+      </header>
+
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="DiaRep">
+          <span class="brand-mark"><img src="/static/logo-mark.png" alt="" /></span>
+          <span><strong>DiaRep</strong><small>Питание и болюс</small></span>
+        </a>
+        <nav class="nav">
+          <a href="/" data-route="home">О сайте</a>
+          <a href="/calculator" data-route="calculator">Калькулятор</a>
+          <a href="/account" data-route="account">Личный кабинет</a>
+          <a href="/journal" data-route="journal">Журнал</a>
+        </nav>
+        <div class="sidebar-panel">
+          <span class="status-dot"></span>
+          <p id="profileStatus">Вход не выполнен</p>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="panel">
+          <div class="section-heading">
+            <span>01</span>
+            <div>
+              <h2>Журнал приёмов пищи</h2>
+              <p>История доступна после входа в личный кабинет.</p>
+            </div>
+          </div>
+
+          <div id="journalAuthNotice" class="notice compact-notice hidden">
+            Чтобы увидеть личный журнал, войдите или зарегистрируйтесь в личном кабинете.
+            <a href="/account">Открыть личный кабинет</a>
+          </div>
+
+          <div id="journalContent">
+            <div class="date-filter" aria-label="Фильтр журнала по дате">
+              <label class="field">
+                <span>С даты</span>
+                <input id="historyDateFrom" type="date" />
+              </label>
+              <label class="field">
+                <span>По дату</span>
+                <input id="historyDateTo" type="date" />
+              </label>
+              <button id="historyClearDates" class="ghost-button" type="button">Сбросить</button>
+            </div>
+            <div id="historyTable" class="meal-ledger empty">История пока пуста.</div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="menuOverlay" class="menu-overlay"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>

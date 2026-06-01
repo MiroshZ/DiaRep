@@ -10,6 +10,10 @@ OPENFOODFACTS_SEARCH_URL = "https://ru.openfoodfacts.org/api/v2/search"
 USER_AGENT = "DiaAgent-MVP/0.1 (nutrition lookup; contact: github.com/MiroshZ/DiaRep)"
 
 API_SLUG_HINTS = {
+    "пепперон": "pizza-pepperoni-topping-regular-crust-frozen-cooked",
+    "pepperoni": "pizza-pepperoni-topping-regular-crust-frozen-cooked",
+    "пицц": "pizza-cheese-topping-regular-crust-frozen-cooked",
+    "pizza": "pizza-cheese-topping-regular-crust-frozen-cooked",
     "греч": "buckwheat-groats-roasted-cooked",
     "рис": "rice-white-medium-grain-cooked-unenriched",
     "банан": "bananas-raw",
@@ -25,7 +29,7 @@ API_SLUG_HINTS = {
 }
 
 MEAL_ITEM_PATTERN = re.compile(
-    r"([а-яёa-z\s-]+?)\s+(\d+(?:[,.]\d+)?)\s*(?:г|гр|грамм|граммов)\b",
+    r"([а-яёa-z\s-]+?)\s*(?:[-—–]\s*)?(\d+(?:[,.]\d+)?)\s*(?:г|гр|грамм|граммов)\b",
     re.IGNORECASE,
 )
 

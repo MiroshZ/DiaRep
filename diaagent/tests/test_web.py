@@ -1,4 +1,5 @@
 import sys
+import uuid
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -15,7 +16,15 @@ def test_index_page_is_served() -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "DiaAgent" in response.text
+    assert "DiaRep" in response.text
+
+
+def test_real_pages_are_served() -> None:
+    for path in ("/calculator", "/account", "/journal"):
+        response = client.get(path)
+
+        assert response.status_code == 200
+        assert "DiaRep" in response.text
 
 
 def test_health_endpoint() -> None:
@@ -84,3 +93,42 @@ def test_recognize_food_photo_endpoint(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["meal_text"] == "рис 150 г"
+
+
+def test_register_login_and_profile_flow() -> None:
+    email = f"test-web-{uuid.uuid4().hex}@example.com"
+    register_response = client.post(
+        "/api/auth/register",
+        json={
+            "name": "Тестовый пользователь",
+            "email": email,
+            "password": "password123",
+        },
+    )
+
+    assert register_response.status_code == 200
+    token = register_response.json()["token"]
+
+    profile_response = client.post(
+        "/api/profile",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "paid_access_active": True,
+            "nightscout_url": "https://example.org",
+            "nightscout_api_key": "read-token",
+            "insulin_to_carb_ratio": 11,
+            "target_glucose_mmol": 6,
+            "correction_factor_mmol": 2,
+        },
+    )
+
+    assert profile_response.status_code == 200
+    assert profile_response.json()["profile"]["nightscout_connected"] is True
+
+    me_response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert me_response.status_code == 200
+    assert me_response.json()["user"]["email"] == email

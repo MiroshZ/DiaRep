@@ -1,103 +1,81 @@
-const profileKey = "diaagent.profile";
+const tokenKey = "diaagent.authToken";
 
 const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => document.querySelectorAll(selector);
 
+const state = {
+  user: null,
+  profile: null,
+  historyItems: [],
+};
+
+const page = document.body.dataset.page || "home";
 const elements = {
   menuToggle: $("#menuToggle"),
   menuOverlay: $("#menuOverlay"),
-  pages: document.querySelectorAll("[data-page]"),
-  navLinks: document.querySelectorAll("[data-route]"),
-  form: $("#calcForm"),
-  mealText: $("#mealText"),
-  foodPhoto: $("#foodPhoto"),
-  recognizePhoto: $("#recognizePhoto"),
-  photoPreview: $("#photoPreview"),
-  photoResult: $("#photoResult"),
-  ratio: $("#ratio"),
-  target: $("#target"),
-  correctionFactor: $("#correctionFactor"),
-  activeInsulin: $("#activeInsulin"),
-  currentGlucose: $("#currentGlucose"),
-  useNightscout: $("#useNightscout"),
-  manualGlucoseField: $("#manualGlucoseField"),
+  navLinks: $$("[data-route]"),
   profileStatus: $("#profileStatus"),
-  paidAccess: $("#paidAccess"),
-  nightscoutUrl: $("#nightscoutUrl"),
-  nightscoutKey: $("#nightscoutKey"),
-  saveProfile: $("#saveProfile"),
-  testNightscout: $("#testNightscout"),
-  applyProfile: $("#applyProfile"),
-  accountRatio: $("#accountRatio"),
-  accountTarget: $("#accountTarget"),
-  accountCorrectionFactor: $("#accountCorrectionFactor"),
-  accessCard: $("#accessCard"),
-  nightscoutCard: $("#nightscoutCard"),
-  lastGlucoseCard: $("#lastGlucoseCard"),
-  lastGlucoseHint: $("#lastGlucoseHint"),
-  proteinMetric: $("#proteinMetric"),
-  fatMetric: $("#fatMetric"),
-  carbsMetric: $("#carbsMetric"),
-  bolusMetric: $("#bolusMetric"),
-  kcalMetric: $("#kcalMetric"),
-  heroBolus: $("#heroBolus"),
-  heroCarbs: $("#heroCarbs"),
-  resultHint: $("#resultHint"),
-  glucoseCard: $("#glucoseCard"),
-  foodTable: $("#foodTable"),
-  warnings: $("#warnings"),
-  explanation: $("#explanation"),
-  accountHistoryTable: $("#accountHistoryTable"),
-  accountDateFrom: $("#accountDateFrom"),
-  accountDateTo: $("#accountDateTo"),
-  accountClearDates: $("#accountClearDates"),
-  historyTable: $("#historyTable"),
-  historyDateFrom: $("#historyDateFrom"),
-  historyDateTo: $("#historyDateTo"),
-  historyClearDates: $("#historyClearDates"),
   toast: $("#toast"),
 };
 
-let historyItems = [];
-const routes = new Set(["home", "calculate", "account", "history", "safety"]);
-
-function currentRoute() {
-  const route = window.location.hash.replace("#", "") || "home";
-  return routes.has(route) ? route : "home";
+function token() {
+  return localStorage.getItem(tokenKey) || "";
 }
 
-function setMenuOpen(open) {
-  document.body.classList.toggle("menu-open", open);
-  elements.menuToggle?.setAttribute("aria-expanded", String(open));
+function setToken(value) {
+  if (value) {
+    localStorage.setItem(tokenKey, value);
+  } else {
+    localStorage.removeItem(tokenKey);
+  }
 }
 
-function renderRoute() {
-  const route = currentRoute();
-  elements.pages.forEach((page) => {
-    page.classList.toggle("active", page.dataset.page === route);
-  });
-  elements.navLinks.forEach((link) => {
-    link.classList.toggle("active", link.dataset.route === route);
-  });
-  setMenuOpen(false);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+function authHeaders() {
+  return token() ? { Authorization: `Bearer ${token()}` } : {};
 }
 
 function showToast(message) {
+  if (!elements.toast) {
+    return;
+  }
   elements.toast.textContent = message;
   elements.toast.classList.add("visible");
   window.setTimeout(() => elements.toast.classList.remove("visible"), 2800);
 }
 
-function getProfile() {
-  try {
-    return JSON.parse(localStorage.getItem(profileKey)) || {};
-  } catch {
-    return {};
+async function apiRequest(url, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...authHeaders(),
+    ...(options.headers || {}),
+  };
+  const response = await fetch(url, { ...options, headers });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.detail || "Запрос не выполнен");
   }
+  return payload;
 }
 
-function saveProfile(profile) {
-  localStorage.setItem(profileKey, JSON.stringify(profile));
+async function uploadRequest(url, formData) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.detail || "Запрос не выполнен");
+  }
+  return payload;
+}
+
+function numberValue(input, fallback = 0) {
+  if (!input) {
+    return fallback;
+  }
+  const value = Number(String(input.value).replace(",", "."));
+  return Number.isFinite(value) ? value : fallback;
 }
 
 function formatNumber(value, digits = 1) {
@@ -105,9 +83,7 @@ function formatNumber(value, digits = 1) {
   if (!Number.isFinite(number)) {
     return "—";
   }
-  return number.toLocaleString("ru-RU", {
-    maximumFractionDigits: digits,
-  });
+  return number.toLocaleString("ru-RU", { maximumFractionDigits: digits });
 }
 
 function escapeHtml(value) {
@@ -119,101 +95,69 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function loadProfile() {
-  const profile = getProfile();
-  elements.paidAccess.value = String(Boolean(profile.paidAccess));
-  elements.nightscoutUrl.value = profile.nightscoutUrl || "";
-  elements.nightscoutKey.value = profile.nightscoutKey || "";
-  elements.accountRatio.value = profile.insulinToCarbRatio || elements.ratio.value;
-  elements.accountTarget.value = profile.targetGlucoseMmol || elements.target.value;
-  elements.accountCorrectionFactor.value =
-    profile.correctionFactorMmol || elements.correctionFactor.value;
-  if (profile.insulinToCarbRatio) {
-    elements.ratio.value = profile.insulinToCarbRatio;
-  }
-  if (profile.targetGlucoseMmol) {
-    elements.target.value = profile.targetGlucoseMmol;
-  }
-  if (profile.correctionFactorMmol) {
-    elements.correctionFactor.value = profile.correctionFactorMmol;
-  }
-  elements.useNightscout.checked = Boolean(
-    profile.paidAccess && profile.nightscoutUrl && profile.nightscoutKey,
-  );
-  updateProfileStatus();
-  updateGlucoseMode();
+function setMenuOpen(open) {
+  document.body.classList.toggle("menu-open", open);
+  elements.menuToggle?.setAttribute("aria-expanded", String(open));
 }
 
-function profileReady() {
-  const profile = getProfile();
-  return Boolean(profile.paidAccess && profile.nightscoutUrl && profile.nightscoutKey);
+function setupNavigation() {
+  elements.navLinks.forEach((link) => {
+    link.classList.toggle("active", link.dataset.route === page);
+    link.addEventListener("click", () => setMenuOpen(false));
+  });
+  elements.menuToggle?.addEventListener("click", () => {
+    setMenuOpen(!document.body.classList.contains("menu-open"));
+  });
+  elements.menuOverlay?.addEventListener("click", () => setMenuOpen(false));
 }
 
 function updateProfileStatus() {
-  const dot = document.querySelector(".status-dot");
-  const profile = getProfile();
-  elements.accessCard.textContent = profile.paidAccess ? "Активен" : "Не активен";
-  elements.nightscoutCard.textContent = profileReady() ? "Подключён" : "Не подключён";
-  if (profile.lastGlucoseMmol) {
-    elements.lastGlucoseCard.textContent = `${profile.lastGlucoseMmol} ммоль/л`;
-    elements.lastGlucoseHint.textContent = profile.lastGlucoseAt
-      ? `Обновлено ${new Date(profile.lastGlucoseAt).toLocaleString("ru-RU")}`
-      : "Получено из Nightscout";
-  } else {
-    elements.lastGlucoseCard.textContent = "—";
-    elements.lastGlucoseHint.textContent = "Проверка ещё не выполнялась";
+  const dot = $(".status-dot");
+  if (!elements.profileStatus || !dot) {
+    return;
   }
 
-  if (profileReady()) {
-    elements.profileStatus.textContent = "Nightscout подключён";
+  if (state.user) {
+    elements.profileStatus.textContent = `${state.user.name}: вход выполнен`;
     dot.classList.add("active");
   } else {
-    elements.profileStatus.textContent = "Nightscout не подключён";
+    elements.profileStatus.textContent = "Вход не выполнен";
     dot.classList.remove("active");
   }
 }
 
-function updateGlucoseMode() {
-  const enabled = elements.useNightscout.checked;
-  elements.manualGlucoseField.classList.toggle("hidden", enabled);
-}
-
-async function apiRequest(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.detail || "Запрос не выполнен");
+async function refreshSession() {
+  if (!token()) {
+    updateProfileStatus();
+    return null;
   }
-  return payload;
-}
 
-async function uploadRequest(url, formData) {
-  const response = await fetch(url, {
-    method: "POST",
-    body: formData,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.detail || "Запрос не выполнен");
+  try {
+    const payload = await apiRequest("/api/auth/me");
+    state.user = payload.user;
+    state.profile = payload.profile;
+    updateProfileStatus();
+    return payload;
+  } catch {
+    setToken("");
+    state.user = null;
+    state.profile = null;
+    updateProfileStatus();
+    return null;
   }
-  return payload;
-}
-
-function numberValue(input) {
-  return Number(input.value.replace(",", "."));
 }
 
 function renderTable(container, rows, columns) {
+  if (!container) {
+    return;
+  }
   if (!rows.length) {
     container.className = "food-table empty";
     container.textContent = "Данных пока нет.";
     return;
   }
 
-  const head = columns.map((column) => `<th>${column.label}</th>`).join("");
+  const head = columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("");
   const body = rows
     .map((row) => {
       const cells = columns
@@ -231,6 +175,9 @@ function renderTable(container, rows, columns) {
 }
 
 function renderMealLedger(container, rows) {
+  if (!container) {
+    return;
+  }
   if (!rows.length) {
     container.className = "meal-ledger empty";
     container.textContent = "За выбранный период записей нет.";
@@ -323,36 +270,154 @@ function filterByDate(rows, fromValue, toValue) {
   });
 }
 
-function renderFilteredHistory() {
-  const accountRows = filterByDate(
-    historyItems,
-    elements.accountDateFrom.value,
-    elements.accountDateTo.value,
+function profileReadyForNightscout() {
+  return Boolean(
+    state.user &&
+      state.profile?.paid_access_active &&
+      state.profile?.nightscout_connected,
   );
-  const historyRows = filterByDate(
-    historyItems,
-    elements.historyDateFrom.value,
-    elements.historyDateTo.value,
-  );
-
-  renderMealLedger(elements.accountHistoryTable, accountRows);
-  renderMealLedger(elements.historyTable, historyRows);
 }
 
-function renderResult(payload) {
+function applyProfileToCalculator() {
+  const profile = state.profile;
+  if (!profile) {
+    return;
+  }
+  const ratio = $("#ratio");
+  const target = $("#target");
+  const correction = $("#correctionFactor");
+  if (ratio) {
+    ratio.value = profile.insulin_to_carb_ratio || ratio.value;
+  }
+  if (target) {
+    target.value = profile.target_glucose_mmol || target.value;
+  }
+  if (correction) {
+    correction.value = profile.correction_factor_mmol || correction.value;
+  }
+}
+
+function initCalculatorPage() {
+  const form = $("#calcForm");
+  if (!form) {
+    return;
+  }
+
+  const useNightscout = $("#useNightscout");
+  const manualGlucoseField = $("#manualGlucoseField");
+  const foodPhoto = $("#foodPhoto");
+  const recognizePhoto = $("#recognizePhoto");
+  const photoPreview = $("#photoPreview");
+  const photoResult = $("#photoResult");
+
+  const updateGlucoseMode = () => {
+    manualGlucoseField?.classList.toggle("hidden", Boolean(useNightscout?.checked));
+  };
+
+  useNightscout?.addEventListener("change", updateGlucoseMode);
+  updateGlucoseMode();
+
+  foodPhoto?.addEventListener("change", () => {
+    const file = foodPhoto.files?.[0];
+    if (!file) {
+      photoPreview?.classList.add("hidden");
+      if (photoPreview) {
+        photoPreview.innerHTML = "";
+      }
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    photoPreview?.classList.remove("hidden");
+    if (photoPreview) {
+      photoPreview.innerHTML = `<img src="${url}" alt="Фото еды" />`;
+    }
+  });
+
+  recognizePhoto?.addEventListener("click", async () => {
+    const file = foodPhoto?.files?.[0];
+    if (!file) {
+      showToast("Сначала выберите фото еды.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    photoResult?.classList.remove("hidden");
+    if (photoResult) {
+      photoResult.textContent = "Gemini анализирует фото...";
+    }
+
+    try {
+      const result = await uploadRequest("/api/recognize-food-photo", formData);
+      $("#mealText").value = result.meal_text;
+      const rows = result.items
+        .map((item) => `${item.name} — ${item.weight_g} г (${item.confidence})`)
+        .join("; ");
+      if (photoResult) {
+        photoResult.textContent = `${rows}. ${result.notes || ""}`.trim();
+      }
+      showToast("Еда распознана и перенесена в форму.");
+    } catch (error) {
+      if (photoResult) {
+        photoResult.textContent = "Распознавание не выполнено.";
+      }
+      showToast(error.message);
+    }
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const resultHint = $("#resultHint");
+    const useNightscoutEnabled = Boolean(useNightscout?.checked);
+
+    if (useNightscoutEnabled && !profileReadyForNightscout()) {
+      showToast("Сначала войдите и привяжите Nightscout в личном кабинете.");
+      return;
+    }
+
+    const payload = {
+      meal_text: $("#mealText").value,
+      insulin_to_carb_ratio: numberValue($("#ratio"), 12),
+      target_glucose_mmol: numberValue($("#target"), 6),
+      correction_factor_mmol: numberValue($("#correctionFactor"), 2),
+      active_insulin: numberValue($("#activeInsulin"), 0),
+      use_nightscout: useNightscoutEnabled,
+    };
+
+    if (!useNightscoutEnabled) {
+      payload.current_glucose_mmol = numberValue($("#currentGlucose"), 6.5);
+    }
+
+    if (resultHint) {
+      resultHint.textContent = "Считаю...";
+    }
+
+    try {
+      const payloadResult = await apiRequest("/api/calculate", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      renderCalculationResult(payloadResult);
+    } catch (error) {
+      if (resultHint) {
+        resultHint.textContent = "Расчёт не выполнен.";
+      }
+      showToast(error.message);
+    }
+  });
+}
+
+function renderCalculationResult(payload) {
   const nutrition = payload.nutrition;
   const result = payload.result;
+  $("#proteinMetric").textContent = `${nutrition.total_protein} г`;
+  $("#fatMetric").textContent = `${nutrition.total_fat} г`;
+  $("#carbsMetric").textContent = `${nutrition.total_carbs} г`;
+  $("#bolusMetric").textContent = `${result.total_bolus} ед.`;
+  $("#kcalMetric").textContent = `${nutrition.total_kcal} ккал`;
+  $("#resultHint").textContent = "Расчёт выполнен.";
 
-  elements.proteinMetric.textContent = `${nutrition.total_protein} г`;
-  elements.fatMetric.textContent = `${nutrition.total_fat} г`;
-  elements.carbsMetric.textContent = `${nutrition.total_carbs} г`;
-  elements.bolusMetric.textContent = `${result.total_bolus} ед.`;
-  elements.kcalMetric.textContent = `${nutrition.total_kcal} ккал`;
-  elements.heroBolus.textContent = `${result.total_bolus} ед.`;
-  elements.heroCarbs.textContent = `${nutrition.total_carbs} г углеводов`;
-  elements.resultHint.textContent = "Расчёт выполнен.";
-
-  renderTable(elements.foodTable, nutrition.items, [
+  renderTable($("#foodTable"), nutrition.items, [
     { key: "name", label: "Продукт" },
     { key: "weight_g", label: "Масса, г" },
     { key: "protein_g", label: "Белки, г" },
@@ -362,188 +427,199 @@ function renderResult(payload) {
     { key: "source", label: "Источник" },
   ]);
 
+  const glucoseCard = $("#glucoseCard");
   if (payload.glucose) {
-    elements.glucoseCard.classList.remove("hidden");
-    elements.glucoseCard.textContent = `Nightscout: ${payload.glucose.glucose_mmol} ммоль/л, тренд ${payload.glucose.direction}`;
+    glucoseCard?.classList.remove("hidden");
+    glucoseCard.textContent = `Nightscout: ${payload.glucose.glucose_mmol} ммоль/л, тренд ${payload.glucose.direction}`;
   } else {
-    elements.glucoseCard.classList.add("hidden");
+    glucoseCard?.classList.add("hidden");
   }
 
-  elements.warnings.innerHTML = payload.warnings
-    .map((warning) => `<div class="warning-item">${warning}</div>`)
+  $("#warnings").innerHTML = payload.warnings
+    .map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`)
     .join("");
-  elements.explanation.textContent = payload.explanation;
+  $("#explanation").textContent = payload.explanation;
 }
 
-async function calculate(event) {
-  event.preventDefault();
-  const profile = getProfile();
-  const useNightscout = elements.useNightscout.checked;
+function fillProfileForm() {
+  const profile = state.profile;
+  if (!profile) {
+    return;
+  }
+  $("#paidAccess").value = String(Boolean(profile.paid_access_active));
+  $("#nightscoutUrl").value = profile.nightscout_url || "";
+  $("#nightscoutKey").value = "";
+  $("#accountRatio").value = profile.insulin_to_carb_ratio || 12;
+  $("#accountTarget").value = profile.target_glucose_mmol || 6;
+  $("#accountCorrectionFactor").value = profile.correction_factor_mmol || 2;
+  $("#accessCard").textContent = profile.paid_access_active ? "Активен" : "Не активен";
+  $("#nightscoutCard").textContent = profile.nightscout_connected
+    ? "Подключён"
+    : "Не подключён";
+}
 
-  if (useNightscout && !profileReady()) {
-    showToast("Сначала подключите Nightscout в личном кабинете.");
+function renderAccountState() {
+  const authForms = $("#authForms");
+  const accountPanel = $("#accountPanel");
+  if (!authForms || !accountPanel) {
     return;
   }
 
-  const payload = {
-    meal_text: elements.mealText.value,
-    insulin_to_carb_ratio: numberValue(elements.ratio),
-    target_glucose_mmol: numberValue(elements.target),
-    correction_factor_mmol: numberValue(elements.correctionFactor),
-    active_insulin: numberValue(elements.activeInsulin),
-    use_nightscout: useNightscout,
-    nightscout_url: profile.nightscoutUrl || "",
-    nightscout_api_key: profile.nightscoutKey || "",
+  authForms.classList.toggle("hidden", Boolean(state.user));
+  accountPanel.classList.toggle("hidden", !state.user);
+  if (state.user) {
+    $("#accountUserName").textContent = state.user.name;
+    $("#accountUserEmail").textContent = state.user.email;
+    fillProfileForm();
+  }
+}
+
+function initAccountPage() {
+  if (page !== "account") {
+    return;
+  }
+
+  $("#registerForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const payload = await apiRequest("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: $("#registerName").value,
+          email: $("#registerEmail").value,
+          password: $("#registerPassword").value,
+        }),
+      });
+      setToken(payload.token);
+      await refreshSession();
+      renderAccountState();
+      showToast("Аккаунт создан.");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  $("#loginForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const payload = await apiRequest("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: $("#loginEmail").value,
+          password: $("#loginPassword").value,
+        }),
+      });
+      setToken(payload.token);
+      await refreshSession();
+      renderAccountState();
+      showToast("Вход выполнен.");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  $("#saveProfile")?.addEventListener("click", async () => {
+    try {
+      const payload = {
+        paid_access_active: $("#paidAccess").value === "true",
+        nightscout_url: $("#nightscoutUrl").value.trim(),
+        nightscout_api_key: $("#nightscoutKey").value.trim(),
+        insulin_to_carb_ratio: numberValue($("#accountRatio"), 12),
+        target_glucose_mmol: numberValue($("#accountTarget"), 6),
+        correction_factor_mmol: numberValue($("#accountCorrectionFactor"), 2),
+      };
+      const result = await apiRequest("/api/profile", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      state.profile = result.profile;
+      fillProfileForm();
+      showToast("Профиль сохранён.");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  $("#testNightscout")?.addEventListener("click", async () => {
+    try {
+      const result = await apiRequest("/api/nightscout/current", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      showToast(`Nightscout работает: ${result.glucose_mmol} ммоль/л.`);
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  $("#logoutButton")?.addEventListener("click", async () => {
+    try {
+      await apiRequest("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Сессия могла уже истечь; локальный выход всё равно нужен.
+    }
+    setToken("");
+    state.user = null;
+    state.profile = null;
+    updateProfileStatus();
+    renderAccountState();
+    showToast("Вы вышли из аккаунта.");
+  });
+}
+
+function initJournalPage() {
+  if (page !== "journal") {
+    return;
+  }
+
+  const fromInput = $("#historyDateFrom");
+  const toInput = $("#historyDateTo");
+  const renderFilteredHistory = () => {
+    renderMealLedger(
+      $("#historyTable"),
+      filterByDate(state.historyItems, fromInput?.value, toInput?.value),
+    );
   };
 
-  if (!useNightscout) {
-    payload.current_glucose_mmol = numberValue(elements.currentGlucose);
-  }
-
-  elements.resultHint.textContent = "Считаю...";
-  try {
-    const result = await apiRequest("/api/calculate", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    renderResult(result);
-    await loadHistory();
-  } catch (error) {
-    elements.resultHint.textContent = "Расчёт не выполнен.";
-    showToast(error.message);
-  }
-}
-
-async function loadHistory() {
-  try {
-    const payload = await apiRequest("/api/history?limit=12");
-    historyItems = payload.items;
+  fromInput?.addEventListener("change", renderFilteredHistory);
+  toInput?.addEventListener("change", renderFilteredHistory);
+  $("#historyClearDates")?.addEventListener("click", () => {
+    fromInput.value = "";
+    toInput.value = "";
     renderFilteredHistory();
-  } catch {
-    elements.accountHistoryTable.className = "meal-ledger empty";
-    elements.accountHistoryTable.textContent = "Журнал недоступен.";
-    elements.historyTable.className = "meal-ledger empty";
-    elements.historyTable.textContent = "История недоступна.";
-  }
-}
-
-function clearDateFilter(fromInput, toInput) {
-  fromInput.value = "";
-  toInput.value = "";
-  renderFilteredHistory();
-}
-
-elements.form.addEventListener("submit", calculate);
-elements.useNightscout.addEventListener("change", updateGlucoseMode);
-window.addEventListener("hashchange", renderRoute);
-elements.menuToggle.addEventListener("click", () => {
-  setMenuOpen(!document.body.classList.contains("menu-open"));
-});
-elements.menuOverlay.addEventListener("click", () => setMenuOpen(false));
-elements.navLinks.forEach((link) => {
-  link.addEventListener("click", () => setMenuOpen(false));
-});
-elements.accountDateFrom.addEventListener("change", renderFilteredHistory);
-elements.accountDateTo.addEventListener("change", renderFilteredHistory);
-elements.historyDateFrom.addEventListener("change", renderFilteredHistory);
-elements.historyDateTo.addEventListener("change", renderFilteredHistory);
-elements.accountClearDates.addEventListener("click", () => {
-  clearDateFilter(elements.accountDateFrom, elements.accountDateTo);
-});
-elements.historyClearDates.addEventListener("click", () => {
-  clearDateFilter(elements.historyDateFrom, elements.historyDateTo);
-});
-
-elements.foodPhoto.addEventListener("change", () => {
-  const file = elements.foodPhoto.files?.[0];
-  if (!file) {
-    elements.photoPreview.classList.add("hidden");
-    elements.photoPreview.innerHTML = "";
-    return;
-  }
-
-  const url = URL.createObjectURL(file);
-  elements.photoPreview.classList.remove("hidden");
-  elements.photoPreview.innerHTML = `<img src="${url}" alt="Фото еды" />`;
-});
-
-elements.recognizePhoto.addEventListener("click", async () => {
-  const file = elements.foodPhoto.files?.[0];
-  if (!file) {
-    showToast("Сначала выберите фото еды.");
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-  elements.photoResult.classList.remove("hidden");
-  elements.photoResult.textContent = "Gemini анализирует фото...";
-
-  try {
-    const result = await uploadRequest("/api/recognize-food-photo", formData);
-    elements.mealText.value = result.meal_text;
-    const rows = result.items
-      .map((item) => `${item.name} — ${item.weight_g} г (${item.confidence})`)
-      .join("; ");
-    elements.photoResult.textContent = `${rows}. ${result.notes || ""}`.trim();
-    showToast("Еда распознана и перенесена в форму.");
-  } catch (error) {
-    elements.photoResult.textContent = "Распознавание не выполнено.";
-    showToast(error.message);
-  }
-});
-
-elements.saveProfile.addEventListener("click", () => {
-  const currentProfile = getProfile();
-  saveProfile({
-    ...currentProfile,
-    paidAccess: elements.paidAccess.value === "true",
-    nightscoutUrl: elements.nightscoutUrl.value.trim(),
-    nightscoutKey: elements.nightscoutKey.value.trim(),
-    insulinToCarbRatio: numberValue(elements.accountRatio),
-    targetGlucoseMmol: numberValue(elements.accountTarget),
-    correctionFactorMmol: numberValue(elements.accountCorrectionFactor),
   });
-  loadProfile();
-  showToast("Профиль сохранён в браузере.");
-});
 
-elements.applyProfile.addEventListener("click", () => {
-  elements.ratio.value = elements.accountRatio.value || elements.ratio.value;
-  elements.target.value = elements.accountTarget.value || elements.target.value;
-  elements.correctionFactor.value =
-    elements.accountCorrectionFactor.value || elements.correctionFactor.value;
-  showToast("Коэффициенты подставлены в форму.");
-});
+  loadHistory(renderFilteredHistory);
+}
 
-elements.testNightscout.addEventListener("click", async () => {
-  const profile = getProfile();
-  if (!profileReady()) {
-    showToast("Сначала заполните профиль Nightscout и активируйте доступ.");
+async function loadHistory(renderFilteredHistory) {
+  const authNotice = $("#journalAuthNotice");
+  const journalContent = $("#journalContent");
+  if (!state.user) {
+    authNotice?.classList.remove("hidden");
+    journalContent?.classList.add("hidden");
     return;
   }
 
+  authNotice?.classList.add("hidden");
+  journalContent?.classList.remove("hidden");
   try {
-    const result = await apiRequest("/api/nightscout/current", {
-      method: "POST",
-      body: JSON.stringify({
-        nightscout_url: profile.nightscoutUrl,
-        nightscout_api_key: profile.nightscoutKey,
-      }),
-    });
-    saveProfile({
-      ...profile,
-      lastGlucoseMmol: result.glucose_mmol,
-      lastGlucoseAt: new Date().toISOString(),
-      lastGlucoseDirection: result.direction,
-    });
-    updateProfileStatus();
-    showToast(`Nightscout работает: ${result.glucose_mmol} ммоль/л.`);
+    const payload = await apiRequest("/api/history?limit=50");
+    state.historyItems = payload.items;
+    renderFilteredHistory();
   } catch (error) {
     showToast(error.message);
   }
-});
+}
 
-loadProfile();
-loadHistory();
-renderRoute();
+async function init() {
+  setupNavigation();
+  await refreshSession();
+  applyProfileToCalculator();
+  initCalculatorPage();
+  initAccountPage();
+  renderAccountState();
+  initJournalPage();
+}
+
+init();

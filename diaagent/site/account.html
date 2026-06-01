@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DiaRep — личный кабинет</title>
+    <link rel="icon" href="/static/logo-mark.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="account">
+    <div class="app-shell">
+      <header class="mobile-header">
+        <a class="brand" href="/" aria-label="DiaRep">
+          <span class="brand-mark"><img src="/static/logo-mark.png" alt="" /></span>
+          <span><strong>DiaRep</strong><small>Питание и болюс</small></span>
+        </a>
+        <button id="menuToggle" class="menu-toggle" type="button" aria-label="Открыть меню">
+          <span></span><span></span><span></span>
+        </button>
+      </header>
+
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="DiaRep">
+          <span class="brand-mark"><img src="/static/logo-mark.png" alt="" /></span>
+          <span><strong>DiaRep</strong><small>Питание и болюс</small></span>
+        </a>
+        <nav class="nav">
+          <a href="/" data-route="home">О сайте</a>
+          <a href="/calculator" data-route="calculator">Калькулятор</a>
+          <a href="/account" data-route="account">Личный кабинет</a>
+          <a href="/journal" data-route="journal">Журнал</a>
+        </nav>
+        <div class="sidebar-panel">
+          <span class="status-dot"></span>
+          <p id="profileStatus">Вход не выполнен</p>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="panel">
+          <div class="section-heading">
+            <span>01</span>
+            <div>
+              <h2>Личный кабинет</h2>
+              <p>Войдите или зарегистрируйтесь, чтобы привязать Nightscout и вести журнал.</p>
+            </div>
+          </div>
+
+          <div id="authForms" class="auth-grid">
+            <form id="registerForm" class="auth-card">
+              <h3>Регистрация</h3>
+              <label class="field">
+                <span>Имя</span>
+                <input id="registerName" type="text" autocomplete="name" required />
+              </label>
+              <label class="field">
+                <span>Email</span>
+                <input id="registerEmail" type="email" autocomplete="email" required />
+              </label>
+              <label class="field">
+                <span>Пароль</span>
+                <input id="registerPassword" type="password" autocomplete="new-password" minlength="6" required />
+              </label>
+              <button class="primary-button" type="submit">Создать аккаунт</button>
+            </form>
+
+            <form id="loginForm" class="auth-card">
+              <h3>Вход</h3>
+              <label class="field">
+                <span>Email</span>
+                <input id="loginEmail" type="email" autocomplete="email" required />
+              </label>
+              <label class="field">
+                <span>Пароль</span>
+                <input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required />
+              </label>
+              <button class="secondary-button" type="submit">Войти</button>
+            </form>
+          </div>
+
+          <div id="accountPanel" class="hidden">
+            <div class="account-overview">
+              <article>
+                <span>Аккаунт</span>
+                <strong id="accountUserName">—</strong>
+                <small id="accountUserEmail">—</small>
+              </article>
+              <article>
+                <span>Nightscout</span>
+                <strong id="nightscoutCard">Не подключён</strong>
+                <small>Источник текущей глюкозы</small>
+              </article>
+              <article>
+                <span>Доступ</span>
+                <strong id="accessCard">Не активен</strong>
+                <small>Включает личные интеграции</small>
+              </article>
+            </div>
+
+            <div class="account-grid">
+              <label class="field">
+                <span>Статус доступа</span>
+                <select id="paidAccess">
+                  <option value="false">Не активен</option>
+                  <option value="true">Активен</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Nightscout URL</span>
+                <input id="nightscoutUrl" type="url" placeholder="https://example-nightscout.ru" />
+              </label>
+              <label class="field">
+                <span>API key / read-only token</span>
+                <input id="nightscoutKey" type="password" autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="section-heading compact">
+              <span>02</span>
+              <div>
+                <h2>Личные коэффициенты</h2>
+                <p>Они будут подставляться в калькулятор после входа.</p>
+              </div>
+            </div>
+
+            <div class="account-grid">
+              <label class="field">
+                <span>Углеводный коэффициент</span>
+                <input id="accountRatio" type="number" min="0.1" step="0.1" />
+              </label>
+              <label class="field">
+                <span>Целевая глюкоза, ммоль/л</span>
+                <input id="accountTarget" type="number" min="0.1" step="0.1" />
+              </label>
+              <label class="field">
+                <span>Фактор чувствительности</span>
+                <input id="accountCorrectionFactor" type="number" min="0.1" step="0.1" />
+              </label>
+            </div>
+
+            <div class="actions">
+              <button id="saveProfile" class="secondary-button" type="button">Сохранить профиль</button>
+              <button id="testNightscout" class="ghost-button" type="button">Проверить Nightscout</button>
+              <button id="logoutButton" class="ghost-button" type="button">Выйти</button>
+            </div>
+            <p class="small-note">
+              Для внешних приложений лучше использовать read-only token с ограниченными правами.
+              Данные Nightscout сохраняются в локальной SQLite-базе проекта.
+            </p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="menuOverlay" class="menu-overlay"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>

@@ -21,6 +21,12 @@ def test_parse_meal_text_with_grams() -> None:
     ]
 
 
+def test_parse_meal_text_with_dash_from_photo_recognition() -> None:
+    items = parse_meal_text("пицца пепперони — 450 г")
+
+    assert items == [{"query": "пицца пепперони", "weight_g": 450.0}]
+
+
 def test_estimate_nutrition_from_text_uses_api_result(monkeypatch) -> None:
     def fake_fetch_food_nutrition(query: str) -> dict:
         return {
@@ -50,6 +56,13 @@ def test_estimate_nutrition_from_text_uses_api_result(monkeypatch) -> None:
 
 def test_rice_uses_all_the_nutrients_slug() -> None:
     assert find_api_slug("рис 100 грамм") == "rice-white-medium-grain-cooked-unenriched"
+
+
+def test_pepperoni_pizza_uses_all_the_nutrients_slug() -> None:
+    assert (
+        find_api_slug("пицца пепперони 450 г")
+        == "pizza-pepperoni-topping-regular-crust-frozen-cooked"
+    )
 
 
 def test_openfoodfacts_rejects_irrelevant_result_name() -> None:

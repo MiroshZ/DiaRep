@@ -276,6 +276,10 @@ select {
   gap: 22px;
 }
 
+.info-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .two-columns {
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
 }
@@ -632,6 +636,47 @@ th {
   padding: 0 18px;
 }
 
+.secondary-link {
+  display: inline-grid;
+  min-height: 44px;
+  place-items: center;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.secondary-link:hover {
+  background: var(--accent-dark);
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.auth-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfefd;
+}
+
+.auth-card h3 {
+  margin: 0;
+}
+
+.auth-card .primary-button,
+.auth-card .secondary-button {
+  margin-top: 0;
+  width: 100%;
+}
+
 .account-overview {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -757,6 +802,15 @@ th {
   transform: translateY(0);
 }
 
+.compact-notice {
+  margin: 0 0 16px;
+}
+
+.compact-notice a {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -846,7 +900,8 @@ th {
   }
 
   .hero,
-  .two-columns {
+  .two-columns,
+  .info-grid {
     grid-template-columns: 1fr;
   }
 
@@ -865,6 +920,7 @@ th {
   .nav,
   .form-grid,
   .account-grid,
+  .auth-grid,
   .account-overview,
   .date-filter,
   .photo-recognition,
