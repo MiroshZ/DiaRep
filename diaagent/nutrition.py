@@ -32,12 +32,93 @@ MEAL_ITEM_PATTERN = re.compile(
     r"([а-яёa-z\s-]+?)\s*(?:[-—–]\s*)?(\d+(?:[,.]\d+)?)\s*(?:г|гр|грамм|граммов)\b",
     re.IGNORECASE,
 )
+QUANTITY_WORDS = {
+    "пол": 0.5,
+    "половина": 0.5,
+    "половинку": 0.5,
+    "один": 1,
+    "одна": 1,
+    "одно": 1,
+    "два": 2,
+    "две": 2,
+    "три": 3,
+    "четыре": 4,
+    "пять": 5,
+    "шесть": 6,
+    "семь": 7,
+    "восемь": 8,
+    "девять": 9,
+    "десять": 10,
+}
+QUANTITY_VALUE_PATTERN = (
+    r"\d+(?:[,.]\d+)?|"
+    + "|".join(sorted(QUANTITY_WORDS, key=len, reverse=True))
+)
+QUANTITY_BEFORE_PATTERN = re.compile(
+    rf"^(?P<quantity>{QUANTITY_VALUE_PATTERN})\s+"
+    r"(?P<name>[а-яёa-z][а-яёa-z\s-]*?)"
+    r"(?:\s+(?:шт\.?|штук|штуки|штука|порция|порции|кусок|куска|кусочка))?$",
+    re.IGNORECASE,
+)
+QUANTITY_AFTER_PATTERN = re.compile(
+    r"^(?P<name>[а-яёa-z][а-яёa-z\s-]*?)\s+"
+    rf"(?P<quantity>{QUANTITY_VALUE_PATTERN})"
+    r"\s*(?:шт\.?|штук|штуки|штука|порция|порции|кусок|куска|кусочка)?$",
+    re.IGNORECASE,
+)
+COMPACT_HALF_PATTERN = re.compile(
+    r"^пол(?P<name>[а-яёa-z-]{3,})$",
+    re.IGNORECASE,
+)
+PORTION_WEIGHT_HINTS_G = {
+    "банан": 120,
+    "яблок": 180,
+    "яйц": 50,
+    "хлеб": 30,
+    "карто": 120,
+    "пицц": 450,
+    "йогурт": 125,
+    "творог": 180,
+    "молок": 200,
+    "курин": 120,
+    "грудк": 120,
+    "котлет": 80,
+    "сырник": 70,
+    "блин": 60,
+}
 
 
 def parse_meal_text(meal_text: str) -> list[dict]:
-    """Разбирает фразу вида 'гречки 50 грамм, яблоко 120 г'."""
+    """Разбирает фразу вида 'гречки 50 грамм, один банан, 2 яйца'."""
     items = []
-    for match in MEAL_ITEM_PATTERN.finditer(meal_text):
+    parts = split_meal_parts(meal_text)
+
+    for part in parts:
+        gram_items = parse_gram_items(part)
+        if gram_items:
+            items.extend(gram_items)
+            continue
+
+        quantity_item = parse_quantity_item(part)
+        if quantity_item:
+            items.append(quantity_item)
+
+    return items
+
+
+def split_meal_parts(meal_text: str) -> list[str]:
+    """Делит описание еды на отдельные продукты."""
+    return [
+        part.strip(" ,.;")
+        for part in re.split(r"[,;\n]+|\s+\+\s+|\s+и\s+", meal_text)
+        if part.strip(" ,.;")
+    ]
+
+
+def parse_gram_items(text: str) -> list[dict]:
+    """Находит продукты с явно указанным весом в граммах."""
+    items = []
+    for match in MEAL_ITEM_PATTERN.finditer(text):
         raw_name = match.group(1).strip(" ,.;")
         weight_g = float(match.group(2).replace(",", "."))
         if raw_name and weight_g > 0:
@@ -49,6 +130,58 @@ def parse_meal_text(meal_text: str) -> list[dict]:
             )
 
     return items
+
+
+def parse_quantity_value(value: str) -> float:
+    """Преобразует число или простое русское числительное в количество."""
+    normalized = value.lower().replace(",", ".").strip()
+    if normalized in QUANTITY_WORDS:
+        return QUANTITY_WORDS[normalized]
+
+    try:
+        return float(normalized)
+    except ValueError:
+        return 0
+
+
+def estimate_portion_weight_g(query: str) -> float | None:
+    """Возвращает примерный вес одной штуки или обычной порции продукта."""
+    normalized_query = normalize_food_name(query)
+    for keyword, weight_g in PORTION_WEIGHT_HINTS_G.items():
+        if keyword in normalized_query:
+            return weight_g
+
+    return None
+
+
+def parse_quantity_item(text: str) -> dict | None:
+    """Разбирает продукты, указанные количеством: 'один банан' или 'банан 1 шт'."""
+    cleaned = text.strip(" ,.;")
+    match = COMPACT_HALF_PATTERN.match(cleaned)
+    quantity = 0.5 if match else 0
+    raw_name = match.group("name") if match else ""
+
+    if not match:
+        match = QUANTITY_BEFORE_PATTERN.match(cleaned) or QUANTITY_AFTER_PATTERN.match(
+            cleaned
+        )
+        if not match:
+            return None
+
+        quantity = parse_quantity_value(match.group("quantity"))
+        raw_name = match.group("name")
+
+    raw_name = raw_name.strip(" ,.;")
+    portion_weight_g = estimate_portion_weight_g(raw_name)
+    if not raw_name or quantity <= 0 or portion_weight_g is None:
+        return None
+
+    return {
+        "query": raw_name,
+        "weight_g": round(quantity * portion_weight_g, 2),
+        "quantity": quantity,
+        "portion_weight_g": portion_weight_g,
+    }
 
 
 def normalize_food_name(value: str) -> str:

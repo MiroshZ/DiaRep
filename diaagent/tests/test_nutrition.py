@@ -27,6 +27,58 @@ def test_parse_meal_text_with_dash_from_photo_recognition() -> None:
     assert items == [{"query": "пицца пепперони", "weight_g": 450.0}]
 
 
+def test_parse_meal_text_with_one_banana() -> None:
+    items = parse_meal_text("один банан")
+
+    assert items == [
+        {
+            "query": "банан",
+            "weight_g": 120,
+            "quantity": 1,
+            "portion_weight_g": 120,
+        }
+    ]
+
+
+def test_parse_meal_text_with_numeric_quantity() -> None:
+    items = parse_meal_text("2 яйца")
+
+    assert items == [
+        {
+            "query": "яйца",
+            "weight_g": 100,
+            "quantity": 2,
+            "portion_weight_g": 50,
+        }
+    ]
+
+
+def test_parse_meal_text_with_half_portion() -> None:
+    items = parse_meal_text("пол яблока")
+
+    assert items == [
+        {
+            "query": "яблока",
+            "weight_g": 90,
+            "quantity": 0.5,
+            "portion_weight_g": 180,
+        }
+    ]
+
+
+def test_parse_meal_text_with_quantity_after_product() -> None:
+    items = parse_meal_text("банан 1 шт")
+
+    assert items == [
+        {
+            "query": "банан",
+            "weight_g": 120,
+            "quantity": 1,
+            "portion_weight_g": 120,
+        }
+    ]
+
+
 def test_estimate_nutrition_from_text_uses_api_result(monkeypatch) -> None:
     def fake_fetch_food_nutrition(query: str) -> dict:
         return {
