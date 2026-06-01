@@ -39,7 +39,8 @@ def test_explanation_mentions_protein_and_fat_context() -> None:
 
     assert "белки 30 г" in explanation
     assert "жиры 22 г" in explanation
-    assert "могут замедлять усвоение еды" in explanation
+    assert "понять" not in explanation
+    assert "может меняться позже" in explanation
 
 
 def test_ai_explanation_uses_strict_agent_payload(monkeypatch) -> None:
@@ -71,9 +72,9 @@ def test_ai_explanation_uses_strict_agent_payload(monkeypatch) -> None:
         captured["api_key"] = api_key
         captured["model"] = model
         return (
-            "Модель получила 40 г углеводов. "
-            "Болюс на еду: 4 ед. Коррекция: 1 ед. "
-            "Расчёт показывает итоговый информационный результат: 5 ед."
+            "В еде получилось 40 г углеводов. "
+            "Часть на еду: 4 ед. Коррекция: 1 ед. "
+            "Расчёт показывает итог: 5 ед."
         )
 
     monkeypatch.setattr(llm_agent, "_call_polza_chat_completion", fake_call)
@@ -90,6 +91,7 @@ def test_ai_explanation_uses_strict_agent_payload(monkeypatch) -> None:
     assert "5 ед" in explanation
     assert captured["api_key"] == "test-key"
     assert captured["model"] == "test-model"
+    assert "ребёнок 7 лет" in captured["messages"][0]["content"]
     assert "не пересчитывай числа самостоятельно" in captured["messages"][0]["content"]
 
 
@@ -118,4 +120,28 @@ def test_generate_explanation_falls_back_for_unsafe_ai_text(monkeypatch) -> None
     explanation = generate_explanation(input_data, result, [], None)
 
     assert "Вам нужно ввести" not in explanation
-    assert "Расчёт показывает итоговый болюс" in explanation
+    assert "Итог этого информационного расчёта" in explanation
+
+
+def test_local_explanation_is_plain_and_human_readable() -> None:
+    input_data = BolusInput(
+        carbs_g=40,
+        insulin_to_carb_ratio=10,
+        current_glucose_mmol=8,
+        target_glucose_mmol=6,
+        correction_factor_mmol=2,
+        active_insulin=0,
+    )
+    result = {
+        "meal_bolus": 4,
+        "correction_bolus": 1,
+        "active_insulin": 0,
+        "total_bolus": 5,
+    }
+
+    explanation = generate_local_explanation(input_data, result, [], None)
+
+    assert "Модель получила" not in explanation
+    assert "Вот что получилось простыми словами" in explanation
+    assert "*" not in explanation
+    assert "#" not in explanation
