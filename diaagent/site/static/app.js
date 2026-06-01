@@ -3,6 +3,10 @@ const profileKey = "diaagent.profile";
 const $ = (selector) => document.querySelector(selector);
 
 const elements = {
+  menuToggle: $("#menuToggle"),
+  menuOverlay: $("#menuOverlay"),
+  pages: document.querySelectorAll("[data-page]"),
+  navLinks: document.querySelectorAll("[data-route]"),
   form: $("#calcForm"),
   mealText: $("#mealText"),
   foodPhoto: $("#foodPhoto"),
@@ -54,6 +58,29 @@ const elements = {
 };
 
 let historyItems = [];
+const routes = new Set(["home", "calculate", "account", "history", "safety"]);
+
+function currentRoute() {
+  const route = window.location.hash.replace("#", "") || "home";
+  return routes.has(route) ? route : "home";
+}
+
+function setMenuOpen(open) {
+  document.body.classList.toggle("menu-open", open);
+  elements.menuToggle?.setAttribute("aria-expanded", String(open));
+}
+
+function renderRoute() {
+  const route = currentRoute();
+  elements.pages.forEach((page) => {
+    page.classList.toggle("active", page.dataset.page === route);
+  });
+  elements.navLinks.forEach((link) => {
+    link.classList.toggle("active", link.dataset.route === route);
+  });
+  setMenuOpen(false);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
 function showToast(message) {
   elements.toast.textContent = message;
@@ -190,7 +217,10 @@ function renderTable(container, rows, columns) {
   const body = rows
     .map((row) => {
       const cells = columns
-        .map((column) => `<td>${escapeHtml(row[column.key] ?? "—")}</td>`)
+        .map(
+          (column) =>
+            `<td data-label="${escapeHtml(column.label)}">${escapeHtml(row[column.key] ?? "—")}</td>`,
+        )
         .join("");
       return `<tr>${cells}</tr>`;
     })
@@ -220,23 +250,23 @@ function renderMealLedger(container, rows) {
 
       return `
         <tr>
-          <td>
+          <td data-label="Время">
             <strong>${escapeHtml(createdAt)}</strong>
             <small>${escapeHtml(source)}</small>
           </td>
-          <td class="meal-cell">
+          <td class="meal-cell" data-label="Еда">
             <strong>${escapeHtml(item.meal_text || "Приём пищи")}</strong>
             <small>${formatNumber(item.kcal, 0)} ккал</small>
           </td>
-          <td>
+          <td data-label="БЖУ">
             <span class="macro-chip protein">Б ${formatNumber(item.protein_g)} г</span>
             <span class="macro-chip fat">Ж ${formatNumber(item.fat_g)} г</span>
             <span class="macro-chip carbs">У ${formatNumber(item.carbs_g)} г</span>
           </td>
-          <td>${formatNumber(item.current_glucose_mmol)} ммоль/л</td>
-          <td>${formatNumber(item.meal_bolus)} ед.</td>
-          <td>${formatNumber(item.correction_bolus)} ед.</td>
-          <td><strong>${formatNumber(item.total_bolus)} ед.</strong></td>
+          <td data-label="Глюкоза">${formatNumber(item.current_glucose_mmol)} ммоль/л</td>
+          <td data-label="Болюс еды">${formatNumber(item.meal_bolus)} ед.</td>
+          <td data-label="Коррекция">${formatNumber(item.correction_bolus)} ед.</td>
+          <td data-label="Итог"><strong>${formatNumber(item.total_bolus)} ед.</strong></td>
         </tr>
       `;
     })
@@ -248,10 +278,10 @@ function renderMealLedger(container, rows) {
       <thead>
         <tr>
           <th>Время</th>
-          <th>Болюс еды</th>
+          <th>Еда</th>
           <th>БЖУ</th>
           <th>Глюкоза</th>
-          <th>Еда</th>
+          <th>Болюс еды</th>
           <th>Коррекция</th>
           <th>Итог</th>
         </tr>
@@ -405,6 +435,14 @@ function clearDateFilter(fromInput, toInput) {
 
 elements.form.addEventListener("submit", calculate);
 elements.useNightscout.addEventListener("change", updateGlucoseMode);
+window.addEventListener("hashchange", renderRoute);
+elements.menuToggle.addEventListener("click", () => {
+  setMenuOpen(!document.body.classList.contains("menu-open"));
+});
+elements.menuOverlay.addEventListener("click", () => setMenuOpen(false));
+elements.navLinks.forEach((link) => {
+  link.addEventListener("click", () => setMenuOpen(false));
+});
 elements.accountDateFrom.addEventListener("change", renderFilteredHistory);
 elements.accountDateTo.addEventListener("change", renderFilteredHistory);
 elements.historyDateFrom.addEventListener("change", renderFilteredHistory);
@@ -508,3 +546,4 @@ elements.testNightscout.addEventListener("click", async () => {
 
 loadProfile();
 loadHistory();
+renderRoute();
