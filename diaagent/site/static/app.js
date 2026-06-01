@@ -309,6 +309,7 @@ function initCalculatorPage() {
   const recognizePhoto = $("#recognizePhoto");
   const photoPreview = $("#photoPreview");
   const photoResult = $("#photoResult");
+  let photoRecognitionRequestId = 0;
 
   const updateGlucoseMode = () => {
     manualGlucoseField?.classList.toggle("hidden", Boolean(useNightscout?.checked));
@@ -317,38 +318,29 @@ function initCalculatorPage() {
   useNightscout?.addEventListener("change", updateGlucoseMode);
   updateGlucoseMode();
 
-  foodPhoto?.addEventListener("change", () => {
+  const recognizeSelectedPhoto = async () => {
     const file = foodPhoto.files?.[0];
-    if (!file) {
-      photoPreview?.classList.add("hidden");
-      if (photoPreview) {
-        photoPreview.innerHTML = "";
-      }
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    photoPreview?.classList.remove("hidden");
-    if (photoPreview) {
-      photoPreview.innerHTML = `<img src="${url}" alt="Фото еды" />`;
-    }
-  });
-
-  recognizePhoto?.addEventListener("click", async () => {
-    const file = foodPhoto?.files?.[0];
     if (!file) {
       showToast("Сначала выберите фото еды.");
       return;
     }
 
+    const requestId = ++photoRecognitionRequestId;
     const formData = new FormData();
     formData.append("file", file);
     photoResult?.classList.remove("hidden");
     if (photoResult) {
       photoResult.textContent = "Gemini анализирует фото...";
     }
+    if (recognizePhoto) {
+      recognizePhoto.disabled = true;
+    }
 
     try {
       const result = await uploadRequest("/api/recognize-food-photo", formData);
+      if (requestId !== photoRecognitionRequestId) {
+        return;
+      }
       $("#mealText").value = result.meal_text;
       const rows = result.items
         .map((item) => `${item.name} — ${item.weight_g} г (${item.confidence})`)
@@ -358,12 +350,45 @@ function initCalculatorPage() {
       }
       showToast("Еда распознана и перенесена в форму.");
     } catch (error) {
+      if (requestId !== photoRecognitionRequestId) {
+        return;
+      }
       if (photoResult) {
-        photoResult.textContent = "Распознавание не выполнено.";
+        photoResult.textContent = error.message.includes("ед")
+          ? error.message
+          : "Распознавание не выполнено. Загрузите фото блюда.";
       }
       showToast(error.message);
+    } finally {
+      if (requestId === photoRecognitionRequestId && recognizePhoto) {
+        recognizePhoto.disabled = false;
+      }
     }
+  };
+
+  foodPhoto?.addEventListener("change", () => {
+    const file = foodPhoto.files?.[0];
+    if (!file) {
+      photoRecognitionRequestId += 1;
+      photoPreview?.classList.add("hidden");
+      photoResult?.classList.add("hidden");
+      if (photoPreview) {
+        photoPreview.innerHTML = "";
+      }
+      if (photoResult) {
+        photoResult.textContent = "";
+      }
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    photoPreview?.classList.remove("hidden");
+    if (photoPreview) {
+      photoPreview.innerHTML = `<img src="${url}" alt="Фото еды" />`;
+    }
+    recognizeSelectedPhoto();
   });
+
+  recognizePhoto?.addEventListener("click", recognizeSelectedPhoto);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

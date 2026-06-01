@@ -11,6 +11,14 @@ from dotenv import load_dotenv
 POLZA_CHAT_COMPLETIONS_URL = "https://polza.ai/api/v1/chat/completions"
 DEFAULT_GEMINI_MODEL = "google/gemini-3.1-flash-lite"
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+NON_FOOD_PHRASES = (
+    "еда не найдена",
+    "еды нет",
+    "нет еды",
+    "food_not_found",
+    "not food",
+    "no food",
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -39,6 +47,9 @@ def _extract_json(text: str) -> dict:
 
 
 def _normalize_items(payload: dict) -> list[dict]:
+    if payload.get("food_detected") is False:
+        return []
+
     items = payload.get("items")
     if not isinstance(items, list):
         return []
@@ -49,6 +60,8 @@ def _normalize_items(payload: dict) -> list[dict]:
             continue
 
         name = str(item.get("name", "")).strip().lower()
+        if any(phrase in name for phrase in NON_FOOD_PHRASES):
+            continue
         try:
             weight_g = float(item.get("weight_g", 0))
         except (TypeError, ValueError):
@@ -103,12 +116,19 @@ def recognize_food_from_image(
     image_base64 = base64.b64encode(image_bytes).decode("ascii")
     image_url = f"data:{mime_type};base64,{image_base64}"
     prompt = (
-        "Ты анализируешь фото еды для приложения подсчёта углеводов. "
-        "Определи видимые продукты и примерный вес каждого продукта в граммах. "
-        "Если вес нельзя оценить точно, дай осторожную приблизительную оценку. "
-        "Не давай медицинских советов. Ответь строго JSON без markdown: "
-        '{"items":[{"name":"название продукта на русском","weight_g":120,'
-        '"confidence":"низкая|средняя|высокая"}],"notes":"короткое пояснение"}'
+        "Ты анализируешь фото только для распознавания еды. "
+        "Сначала проверь, есть ли на фото реальная еда или напиток. "
+        "Если еды или напитка нет, если фото неясное, это упаковка без видимой еды, "
+        "человек, животное, предмет, экран, документ или интерьер, не придумывай "
+        "продукты и верни пустой список. "
+        "Если еда есть, определи только видимые продукты и примерный вес каждого "
+        "продукта в граммах. Если вес нельзя оценить точно, дай осторожную "
+        "приблизительную оценку. Не давай медицинских советов. "
+        "Ответь строго JSON без markdown: "
+        '{"food_detected":true,"items":[{"name":"название продукта на русском",'
+        '"weight_g":120,"confidence":"низкая|средняя|высокая"}],'
+        '"notes":"короткое пояснение"} '
+        'или {"food_detected":false,"items":[],"notes":"еда на фото не найдена"}'
     )
     request_payload = {
         "model": model,
@@ -152,7 +172,16 @@ def recognize_food_from_image(
     payload = _extract_json(str(message.get("content") or ""))
     items = _normalize_items(payload)
     if not items:
-        raise GeminiFoodRecognitionError("Не удалось распознать продукты на фото.")
+        note = str(payload.get("notes", "")).strip().lower()
+        if payload.get("food_detected") is False or any(
+            phrase in note for phrase in NON_FOOD_PHRASES
+        ):
+            raise GeminiFoodRecognitionError(
+                "На фото не удалось уверенно найти еду. Загрузите фото блюда."
+            )
+        raise GeminiFoodRecognitionError(
+            "Не удалось уверенно распознать еду на фото. Попробуйте другое фото."
+        )
 
     return {
         "items": items,

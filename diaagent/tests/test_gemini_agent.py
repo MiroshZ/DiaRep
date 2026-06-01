@@ -34,6 +34,30 @@ def test_normalize_items_skips_invalid_values() -> None:
     assert items == [{"name": "рис", "weight_g": 150, "confidence": "высокая"}]
 
 
+def test_normalize_items_returns_empty_when_food_not_detected() -> None:
+    items = _normalize_items(
+        {
+            "food_detected": False,
+            "items": [{"name": "пицца", "weight_g": 200, "confidence": "высокая"}],
+        }
+    )
+
+    assert items == []
+
+
+def test_normalize_items_skips_non_food_placeholders() -> None:
+    items = _normalize_items(
+        {
+            "items": [
+                {"name": "еда не найдена", "weight_g": 200},
+                {"name": "нет еды на фото", "weight_g": 100},
+            ]
+        }
+    )
+
+    assert items == []
+
+
 def test_build_meal_text() -> None:
     meal_text = build_meal_text(
         [
